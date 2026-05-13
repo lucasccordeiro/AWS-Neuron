@@ -57,7 +57,7 @@ non-concatenated sources remain the authoritative editable form; everything
 in `build/` is regenerated from them.
 
 A single ESBMC limitation is the entire reason for the build step. If
-[the upstream issue](https://github.com/esbmc/esbmc/issues/) gets fixed, the
+[the upstream issue](https://github.com/esbmc/esbmc/issues/4509) gets fixed, the
 Makefile collapses to a few imports and the build step retires.
 
 ## Targets

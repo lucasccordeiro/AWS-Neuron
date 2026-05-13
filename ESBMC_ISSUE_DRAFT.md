@@ -1,7 +1,7 @@
-# DRAFT: ESBMC upstream issue
+# ESBMC upstream issue (filed)
 
-> Status: not yet filed. Review before posting to
-> https://github.com/esbmc/esbmc/issues/
+> Filed as https://github.com/esbmc/esbmc/issues/4509 (labels: `python`, `bug`).
+> This file is kept for reference; track status on the issue itself.
 
 ---
 
