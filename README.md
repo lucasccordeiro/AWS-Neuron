@@ -45,6 +45,7 @@ pinpointing the violated contract.
 | `transpose2d_buggy.py` | Same kernel with `i_f2*sz_f2 + i_f1` (wrong stride) on the destination | `VERIFICATION FAILED` at `slice_cols: c1 <= src.d1` |
 | `matmul_contributed.py` | Community matmul kernel from `contributed/`, harness at NUM_BLOCK_K/M/N = 1 | `VERIFICATION SUCCESSFUL` |
 | `matmul_contributed_big.py` | Same kernel at NUM_BLOCK_K/M/N = 2 (block-interaction across outer loops) | `VERIFICATION SUCCESSFUL` |
+| `matmul_contributed_buggy.py` | Positive control: inner-loop column-end off-by-one (`m_end = m_start + TILE_M + 1`) | `VERIFICATION FAILED` at `ni_nc_matmul: a.d1 <= GEMM_STATIONARY_FMAX` |
 
 ## How to run
 
@@ -58,6 +59,7 @@ esbmc transpose2d_good.py
 esbmc transpose2d_buggy.py
 esbmc matmul_contributed.py
 esbmc matmul_contributed_big.py
+esbmc matmul_contributed_buggy.py
 ```
 
 Each run completes in about 1–3 seconds wall-clock on a stock laptop, using
