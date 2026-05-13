@@ -28,6 +28,16 @@ class Tile3D:
         self.dtype: int = dtype
         self.buffer: int = buffer
 
+class Tile4D:
+    """Rank-4 tile: shape (d0, d1, d2, d3). d0 is the partition axis."""
+    def __init__(self, d0: int, d1: int, d2: int, d3: int, dtype: int, buffer: int):
+        self.d0: int = d0
+        self.d1: int = d1
+        self.d2: int = d2
+        self.d3: int = d3
+        self.dtype: int = dtype
+        self.buffer: int = buffer
+
 # ============================================================== Buffer tags
 
 BUF_HBM: int        = 1
@@ -375,6 +385,116 @@ def nl_store_fancy_3d(dst: Tile3D,
         assert 0 <= w
         assert w < dst.d2
     assert dst.dtype == value.dtype
+
+# Allocation for 4-D tiles. d0 is the partition axis.
+def nl_ndarray_4d(d0: int, d1: int, d2: int, d3: int,
+                  dtype: int, buffer: int) -> Tile4D:
+    assert d0 > 0
+    assert d1 > 0
+    assert d2 > 0
+    assert d3 > 0
+    if buffer == BUF_SBUF or buffer == BUF_PSUM:
+        assert d0 <= PMAX
+    return Tile4D(d0, d1, d2, d3, dtype, buffer)
+
+def nl_zeros_4d(d0: int, d1: int, d2: int, d3: int,
+                dtype: int, buffer: int) -> Tile4D:
+    return nl_ndarray_4d(d0, d1, d2, d3, dtype, buffer)
+
+# Masked 4-D fancy load: HBM 4-D tensor -> SBUF 4-D tile, mask on partition axis.
+def nl_load_fancy_4d_to_4d(src: Tile4D,
+                           p_idx: IndexTensor,
+                           d_idx: IndexTensor,
+                           h_idx: IndexTensor,
+                           w_idx: IndexTensor,
+                           mask_max_p: int,
+                           out_d0: int, out_d1: int, out_d2: int, out_d3: int,
+                           dtype: int) -> Tile4D:
+    p: int = nondet_int()
+    d: int = nondet_int()
+    h: int = nondet_int()
+    w: int = nondet_int()
+    __ESBMC_assume(p_idx.low <= p)
+    __ESBMC_assume(p < p_idx.high)
+    __ESBMC_assume(d_idx.low <= d)
+    __ESBMC_assume(d < d_idx.high)
+    __ESBMC_assume(h_idx.low <= h)
+    __ESBMC_assume(h < h_idx.high)
+    __ESBMC_assume(w_idx.low <= w)
+    __ESBMC_assume(w < w_idx.high)
+    if p < mask_max_p:
+        assert 0 <= p
+        assert p < src.d0
+        assert 0 <= d
+        assert d < src.d1
+        assert 0 <= h
+        assert h < src.d2
+        assert 0 <= w
+        assert w < src.d3
+    assert out_d0 > 0
+    assert out_d1 > 0
+    assert out_d2 > 0
+    assert out_d3 > 0
+    assert out_d0 <= PMAX
+    return Tile4D(out_d0, out_d1, out_d2, out_d3, dtype, BUF_SBUF)
+
+# Masked 4-D fancy store: SBUF 4-D tile -> HBM 4-D tensor, mask on partition axis.
+def nl_store_fancy_4d(dst: Tile4D,
+                      p_idx: IndexTensor,
+                      d_idx: IndexTensor,
+                      h_idx: IndexTensor,
+                      w_idx: IndexTensor,
+                      mask_max_p: int,
+                      value: Tile4D) -> None:
+    p: int = nondet_int()
+    d: int = nondet_int()
+    h: int = nondet_int()
+    w: int = nondet_int()
+    __ESBMC_assume(p_idx.low <= p)
+    __ESBMC_assume(p < p_idx.high)
+    __ESBMC_assume(d_idx.low <= d)
+    __ESBMC_assume(d < d_idx.high)
+    __ESBMC_assume(h_idx.low <= h)
+    __ESBMC_assume(h < h_idx.high)
+    __ESBMC_assume(w_idx.low <= w)
+    __ESBMC_assume(w < w_idx.high)
+    if p < mask_max_p:
+        assert 0 <= p
+        assert p < dst.d0
+        assert 0 <= d
+        assert d < dst.d1
+        assert 0 <= h
+        assert h < dst.d2
+        assert 0 <= w
+        assert w < dst.d3
+    assert dst.dtype == value.dtype
+
+# Bound-check a 4-D fancy access into a 4-D SBUF tile (read or write).
+def tile_fancy_access_4d(t: Tile4D,
+                         p_idx: IndexTensor,
+                         d_idx: IndexTensor,
+                         h_idx: IndexTensor,
+                         w_idx: IndexTensor) -> None:
+    p: int = nondet_int()
+    d: int = nondet_int()
+    h: int = nondet_int()
+    w: int = nondet_int()
+    __ESBMC_assume(p_idx.low <= p)
+    __ESBMC_assume(p < p_idx.high)
+    __ESBMC_assume(d_idx.low <= d)
+    __ESBMC_assume(d < d_idx.high)
+    __ESBMC_assume(h_idx.low <= h)
+    __ESBMC_assume(h < h_idx.high)
+    __ESBMC_assume(w_idx.low <= w)
+    __ESBMC_assume(w < w_idx.high)
+    assert 0 <= p
+    assert p < t.d0
+    assert 0 <= d
+    assert d < t.d1
+    assert 0 <= h
+    assert h < t.d2
+    assert 0 <= w
+    assert w < t.d3
 
 # Bound-check a 3-D fancy access into a 3-D SBUF tile.
 #   tile[p_idx, h_idx, w_idx]   (read or write — semantics identical for bounds)

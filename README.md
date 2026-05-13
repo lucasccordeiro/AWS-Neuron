@@ -60,10 +60,12 @@ A single ESBMC limitation is the entire reason for the build step. If
 [the upstream issue](https://github.com/esbmc/esbmc/issues/4509) gets fixed, the
 Makefile collapses to a few imports and the build step retires.
 
-A second ESBMC Python-frontend bug (silent JSON-type-error crash on bare
-`var: int` annotations inside `while` bodies) was hit during the
-interpolate_bilinear port; the workaround is to initialise every such
-variable. Draft issue body in `ESBMC_ISSUE_2_DRAFT.md`.
+A second ESBMC Python-frontend bug — silent JSON-type-error crash on bare
+`var: int` annotations inside `while` bodies — surfaced during the
+interpolate_bilinear port and is filed as
+[esbmc/esbmc#4510](https://github.com/esbmc/esbmc/issues/4510). The
+workaround is to initialise every such variable; all the loop-local
+conditional bindings in `interpolate_*` apply it.
 
 ## Targets
 
@@ -81,6 +83,8 @@ variable. Draft issue body in `ESBMC_ISSUE_2_DRAFT.md`.
 | `maxpooling_buggy` | `kernels/maxpooling_buggy.py` | `harness/maxpooling_buggy.py` | `FAILED` |
 | `interpolate_bilinear` | `kernels/interpolate_bilinear.py` | `harness/interpolate_bilinear.py` | `SUCCESSFUL` |
 | `interpolate_bilinear_buggy` | `kernels/interpolate_bilinear_buggy.py` | `harness/interpolate_bilinear_buggy.py` | `FAILED` |
+| `interpolate_trilinear` | `kernels/interpolate_trilinear.py` | `harness/interpolate_trilinear.py` | `SUCCESSFUL` |
+| `interpolate_trilinear_buggy` | `kernels/interpolate_trilinear_buggy.py` | `harness/interpolate_trilinear_buggy.py` | `FAILED` |
 
 The `build.py` manifest is the single source of truth for these pairings,
 the ESBMC flags, and the expected verdicts.
@@ -103,10 +107,10 @@ suite (8 targets) finishes in under 15 seconds.
 `stubs.py` provides shape-and-dtype models for:
 
 ```
-Tile, Tile3D                        # 2-D and 3-D tiles (d0..d2, dtype, buffer)
+Tile, Tile3D, Tile4D                # 2-D, 3-D, 4-D tiles (d0..d3, dtype, buffer)
 IndexTensor                         # value-range model for mgrid-style indices
-nl_ndarray_2d / _3d                 # allocation; partition-dim limit on SBUF/PSUM
-nl_zeros_2d / _3d                   # zero-initialised allocation
+nl_ndarray_2d / _3d / _4d           # allocation; partition-dim limit on SBUF/PSUM
+nl_zeros_2d / _3d / _4d             # zero-initialised allocation
 slice2d, slice_cols                 # view-style slicing
 nl_load_2d, nl_store_2d             # HBM <-> SBUF with implicit slicing
 slab_get / set / cols_get / set     # 3-D indexing for matmul-style layouts
@@ -120,9 +124,10 @@ mgrid_axis, index_add, index_add_scalar,
 index_mul_scalar, index_neg_plus_scalar     # index-arithmetic combinators
 nl_load_fancy_2d_to_3d              # masked 2-D fancy load (with base + offset)
 nl_load_fancy_3d_to_3d              # masked 3-D fancy load
-nl_store_fancy_2d, nl_store_fancy_3d # masked fancy store
+nl_load_fancy_4d_to_4d              # masked 4-D fancy load
+nl_store_fancy_2d, _3d, _4d         # masked fancy store
 nl_max_fancy_3d_to_2d               # masked fancy max reduction
-tile_fancy_access_3d                # bound-check on 3-D fancy access (read/write)
+tile_fancy_access_3d, _4d           # bound-check on fancy access (read/write)
 ```
 
 Fancy-indexing checks use a *nondet representative element* technique:
@@ -172,13 +177,12 @@ current stub library covers:
 - `interpolate_bilinear_fwd.py` (3-D HBM fancy load/store, 3-D SBUF fancy
   accesses for in-place writes to multiple regions of `out_tile`, integer
   rewrites of `math.ceil` and `max`/`min`).
+- `interpolate_trilinear_fwd.py` (4-D tiles; same fancy-index pattern family
+  as bilinear but extended to a depth axis: 1 core volume + 3 face types +
+  3 edge types + corners, 7 distinct fancy-write regions per inner iteration).
 
 Deferred:
 
-- `interpolate_trilinear_fwd.py` — same pattern family as bilinear but
-  with 4-D tiles (extra depth axis). Requires Tile4D + a parallel set of
-  4-D fancy-indexing stubs; mechanically similar but doubles the stub
-  surface.
 - `pipelined_attention.py` — uses attention-specific primitives
   (`ni.nc_matmul` with non-trivial accumulator routing, softmax,
   scaled-dot-product structure) that go beyond the current

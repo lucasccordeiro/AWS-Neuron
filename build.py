@@ -66,6 +66,14 @@ MANIFEST: list[Target] = [
                                    "interpolate_bilinear_buggy.py",
                                                           "interpolate_bilinear_buggy.py",
            (),                     "FAILED"),
+    Target("interpolate_trilinear",
+                                   "interpolate_trilinear.py",
+                                                          "interpolate_trilinear.py",
+           (),                     "SUCCESSFUL"),
+    Target("interpolate_trilinear_buggy",
+                                   "interpolate_trilinear_buggy.py",
+                                                          "interpolate_trilinear_buggy.py",
+           (),                     "FAILED"),
 ]
 
 
