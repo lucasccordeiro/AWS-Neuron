@@ -41,6 +41,7 @@ pinpointing the violated contract.
 ├── verify.py           # manifest of (entry script, ESBMC args, expected verdict)
 ├── Makefile            # `make verify`
 ├── AUDIT.md            # canonical-stubs audit + per-port stub-correctness findings
+├── RETROSPECTIVE.md    # what the PoC exercised + what it surfaced
 └── harness/            # everything ESBMC sees
     ├── stubs.py        # canonical stub library — single source of truth
     ├── kernels/        # ported NKI kernels, each `from stubs import *`
