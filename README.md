@@ -34,49 +34,76 @@ explores every iteration and reports either `VERIFICATION SUCCESSFUL` (all
 asserts hold on all paths) or `VERIFICATION FAILED` with a counterexample
 pinpointing the violated contract.
 
-## Files
+## Layout
 
-| File | Purpose | Expected result |
-|---|---|---|
-| `tensor_add_good.py` | `nki_tensor_add` kernel, well-formed harness at M=256, N=1024 | `VERIFICATION SUCCESSFUL` |
-| `tensor_add_buggy.py` | Same kernel with `(m+2)*TILE_M` off-by-one in one DMA slice | `VERIFICATION FAILED` at `nisa_dma_copy: dst.d0 == src.d0` |
-| `tensor_add_symbolic.py` | `nki_tensor_add` over a *family* of shapes: M = km·128, N = kn·512 for km, kn ∈ [1, 4] | `VERIFICATION SUCCESSFUL` |
-| `transpose2d_good.py` | `tensor_transpose2D_kernel` at P=2, F1=3, F2=4 | `VERIFICATION SUCCESSFUL` |
-| `transpose2d_buggy.py` | Same kernel with `i_f2*sz_f2 + i_f1` (wrong stride) on the destination | `VERIFICATION FAILED` at `slice_cols: c1 <= src.d1` |
-| `matmul_contributed.py` | Community matmul kernel from `contributed/`, harness at NUM_BLOCK_K/M/N = 1 | `VERIFICATION SUCCESSFUL` |
-| `matmul_contributed_big.py` | Same kernel at NUM_BLOCK_K/M/N = 2 (block-interaction across outer loops) | `VERIFICATION SUCCESSFUL` |
-| `matmul_contributed_buggy.py` | Positive control: inner-loop column-end off-by-one (`m_end = m_start + TILE_M + 1`) | `VERIFICATION FAILED` at `ni_nc_matmul: a.d1 <= GEMM_STATIONARY_FMAX` |
+```
+.
+├── stubs.py          # CANONICAL stub library — single source of truth
+├── kernels/          # Ported NKI kernels (one per file, no stubs, no harness)
+├── harness/          # Concrete or symbolic drivers (one per build target)
+├── build.py          # Manifest of (kernel, harness, ESBMC args, expected verdict)
+├── Makefile          # `make build` / `make verify` / `make clean`
+├── AUDIT.md          # Pre-refactor audit of the original duplicated stubs
+└── build/            # AUTO-GENERATED: stubs + kernel + harness concatenated;
+                     # this is what ESBMC actually runs. Gitignored.
+```
+
+Why a build step? ESBMC 8.2.0's Python frontend does not resolve transitive
+imports through an intermediate module: a harness file that imports a kernel
+file that imports `stubs.py` will fail to bind the stub symbols at kernel-call
+sites. So the build step concatenates `stubs.py` + the kernel file + the
+harness file into a single ESBMC-ready artifact under `build/`. The
+non-concatenated sources remain the authoritative editable form; everything
+in `build/` is regenerated from them.
+
+A single ESBMC limitation is the entire reason for the build step. If
+[the upstream issue](https://github.com/esbmc/esbmc/issues/) gets fixed, the
+Makefile collapses to a few imports and the build step retires.
+
+## Targets
+
+| Build target | Kernel | Harness | Expected |
+|---|---|---|---|
+| `tensor_add` | `kernels/tensor_add.py` | `harness/tensor_add.py` | `SUCCESSFUL` |
+| `tensor_add_buggy` | `kernels/tensor_add_buggy.py` | `harness/tensor_add_buggy.py` | `FAILED` |
+| `tensor_add_symbolic` | `kernels/tensor_add.py` | `harness/tensor_add_symbolic.py` | `SUCCESSFUL` (`--unwind 6`) |
+| `transpose2d` | `kernels/transpose2d.py` | `harness/transpose2d.py` | `SUCCESSFUL` |
+| `transpose2d_buggy` | `kernels/transpose2d_buggy.py` | `harness/transpose2d_buggy.py` | `FAILED` |
+| `matmul` | `kernels/matmul.py` | `harness/matmul.py` | `SUCCESSFUL` |
+| `matmul_big` | `kernels/matmul.py` | `harness/matmul_big.py` | `SUCCESSFUL` |
+| `matmul_buggy` | `kernels/matmul_buggy.py` | `harness/matmul_buggy.py` | `FAILED` |
+
+The `build.py` manifest is the single source of truth for these pairings,
+the ESBMC flags, and the expected verdicts.
 
 ## How to run
 
 Requires ESBMC 8.2.0 or later with the Python frontend.
 
 ```bash
-esbmc tensor_add_good.py
-esbmc tensor_add_buggy.py
-esbmc --unwind 6 tensor_add_symbolic.py
-esbmc transpose2d_good.py
-esbmc transpose2d_buggy.py
-esbmc matmul_contributed.py
-esbmc matmul_contributed_big.py
-esbmc matmul_contributed_buggy.py
+make verify           # build, run ESBMC on every target, tally results
+make build            # regenerate build/*.py only
+make clean            # remove build/
 ```
 
-Each run completes in about 1–3 seconds wall-clock on a stock laptop, using
-the default Bitwuzla solver.
+Each target completes in 1–3 seconds wall-clock on a stock laptop; the full
+suite (8 targets) finishes in under 15 seconds.
 
 ## Stub-library scope
 
-The library provides shape-and-dtype models for:
+`stubs.py` provides shape-and-dtype models for:
 
 ```
-Tile                        # rank-2 tile with d0, d1, dtype, buffer
-nl_ndarray(d0, d1, ...)     # allocates a tile; checks partition-dim limit on SBUF
-slice2d(src, r0, r1, c0, c1) # 2-D slice; checks all four bounds
-slice_cols(src, c0, c1)     # column-strip slice; for transpose's ds()-style indexing
-nisa_dma_copy(dst, src)     # shape and dtype equality
-nisa_tensor_tensor(dst, a, b)  # ternary shape and dtype equality
-nisa_tensor_copy(dst, src)  # shape and dtype equality
+Tile, Tile3D                        # 2-D and 3-D tiles (d0..d2, dtype, buffer)
+nl_ndarray_2d / _3d                 # allocation; partition-dim limit on SBUF/PSUM
+nl_zeros_2d / _3d                   # zero-initialised allocation
+slice2d, slice_cols                 # view-style slicing
+nl_load_2d, nl_store_2d             # HBM <-> SBUF with implicit slicing
+slab_get / set / cols_get / set     # 3-D indexing for matmul-style layouts
+nisa_dma_copy, _tensor_tensor,      # ISA-level ops with shape + dtype checks
+   _tensor_copy
+ni_nc_matmul                        # nc_matmul with par-dim + GEMM FMAX limits
+iadd, nl_loop_reduce                # accumulation in PSUM, loop reduction
 ```
 
 The full NKI runtime needs roughly a dozen more such stubs to cover the
