@@ -85,6 +85,10 @@ conditional bindings in `interpolate_*` apply it.
 | `interpolate_bilinear_buggy` | `kernels/interpolate_bilinear_buggy.py` | `harness/interpolate_bilinear_buggy.py` | `FAILED` |
 | `interpolate_trilinear` | `kernels/interpolate_trilinear.py` | `harness/interpolate_trilinear.py` | `SUCCESSFUL` |
 | `interpolate_trilinear_buggy` | `kernels/interpolate_trilinear_buggy.py` | `harness/interpolate_trilinear_buggy.py` | `FAILED` |
+| `matmul_basic` | `kernels/matmul_basic.py` | `harness/matmul_basic.py` | `SUCCESSFUL` |
+| `matmul_basic_buggy` | `kernels/matmul_basic_buggy.py` | `harness/matmul_basic_buggy.py` | `FAILED` |
+| `mamba_v1` | `kernels/mamba_v1.py` | `harness/mamba_v1.py` | `SUCCESSFUL` |
+| `mamba_v1_buggy` | `kernels/mamba_v1_buggy.py` | `harness/mamba_v1_buggy.py` | `FAILED` |
 
 The `build.py` manifest is the single source of truth for these pairings,
 the ESBMC flags, and the expected verdicts.
@@ -116,7 +120,11 @@ nl_load_2d, nl_store_2d             # HBM <-> SBUF with implicit slicing
 slab_get / set / cols_get / set     # 3-D indexing for matmul-style layouts
 nisa_dma_copy, _tensor_tensor,      # ISA-level ops with shape + dtype checks
    _tensor_copy
-ni_nc_matmul                        # nc_matmul with par-dim + GEMM FMAX limits
+ni_nc_matmul, nisa_nc_matmul        # nc_matmul (returning + explicit-destination)
+nisa_activation                     # elementwise unary (e.g. nl.exp) with scale
+nisa_tensor_tensor_scan             # associative scan (shape-passthrough)
+nl_broadcast_to                     # 1-axis broadcast to a new shape
+slice_3d_at                         # 3-D tensor with scalar + range axes
 iadd, nl_loop_reduce                # accumulation in PSUM, loop reduction
 
 # Fancy indexing (mgrid, masked load/store, masked reduction)
@@ -180,6 +188,20 @@ current stub library covers:
 - `interpolate_trilinear_fwd.py` (4-D tiles; same fancy-index pattern family
   as bilinear but extended to a depth axis: 1 core volume + 3 face types +
   3 edge types + corners, 7 distinct fancy-write regions per inner iteration).
+
+Other tutorials covered:
+
+- `matrix_multiplication/nki_matmul_basic_` — fixed 64x128x512 matmul using
+  `nisa.nc_matmul` (explicit-destination form, distinct from the returning
+  `ni.nc_matmul` exercised by `contributed/matmul.py`). The port surfaced
+  AUDIT Finding 9: `nisa.tensor_copy` doubles as a PSUM-fp32 → SBUF-fp16
+  cast and the original stub's strict dtype-equality check rejected the
+  well-formed kernel.
+- `fused_mamba/mamba_v1` — selective state-space model (real production
+  ML kernel). New stubs: `nisa.activation` (elementwise unary with
+  broadcastable scale), `nl.broadcast_to` (1-axis broadcast), `nisa.tensor_tensor_scan`
+  (associative scan, shape-passthrough), and `slice_3d_at` (3-D tensor
+  with one scalar + two range axes).
 
 Deferred:
 

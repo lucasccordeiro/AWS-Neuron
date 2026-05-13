@@ -185,11 +185,52 @@ def nisa_tensor_tensor(dst: Tile, a: Tile, b: Tile) -> None:
     assert dst.dtype == a.dtype
     assert a.dtype  == b.dtype
 
-# nisa.tensor_copy(dst, src): shapes and dtypes must match.
+# 3-D tensor slice with one scalar axis and two range axes:
+#   src[i, r0:r1, c0:c1]  (scalar i drops axis 0; result is 2-D)
+def slice_3d_at(src: Tile3D, i: int, r0: int, r1: int, c0: int, c1: int) -> Tile:
+    assert 0 <= i
+    assert i < src.d0
+    assert 0 <= r0
+    assert r0 <= r1
+    assert r1 <= src.d1
+    assert 0 <= c0
+    assert c0 <= c1
+    assert c1 <= src.d2
+    return Tile(r1 - r0, c1 - c0, src.dtype, src.buffer)
+
+# nl.broadcast_to(src, (new_d0, new_d1)) — each source dim must either match
+# or be 1. The 1-dim is replicated to the new size.
+def nl_broadcast_to(src: Tile, new_d0: int, new_d1: int) -> Tile:
+    assert src.d0 == new_d0 or src.d0 == 1
+    assert src.d1 == new_d1 or src.d1 == 1
+    return Tile(new_d0, new_d1, src.dtype, src.buffer)
+
+# nisa.activation(dst, op, data, scale) — elementwise unary activation
+# (e.g. op = nl.exp) with optional per-element scale.
+# dst.shape == data.shape; scale matches data or broadcasts across the free dim.
+def nisa_activation(dst: Tile, data: Tile, scale: Tile) -> None:
+    assert dst.d0 == data.d0
+    assert dst.d1 == data.d1
+    assert scale.d0 == data.d0
+    assert scale.d1 == data.d1 or scale.d1 == 1
+    assert dst.dtype == data.dtype
+
+# nisa.tensor_tensor_scan(dst, data0, data1, initial, op0, op1) — associative
+# scan combining two operand streams; shape and dtype passthrough.
+def nisa_tensor_tensor_scan(dst: Tile, data0: Tile, data1: Tile) -> None:
+    assert dst.d0 == data0.d0
+    assert data0.d0 == data1.d0
+    assert dst.d1 == data0.d1
+    assert data0.d1 == data1.d1
+    assert dst.dtype == data0.dtype
+    assert data0.dtype == data1.dtype
+
+# nisa.tensor_copy(dst, src): shapes must match. Dtype need not — this
+# instruction is also the standard way to cast (e.g. PSUM fp32 -> SBUF fp16),
+# as used in matrix_multiplication's nki_matmul_basic_. (Audit Finding 9.)
 def nisa_tensor_copy(dst: Tile, src: Tile) -> None:
     assert dst.d0 == src.d0
     assert dst.d1 == src.d1
-    assert dst.dtype == src.dtype
 
 # ni.nc_matmul(a, b): a is (par_dim, M_stationary), b is (par_dim, N_moving);
 # returns (M, N). Hardware constraints: par_dim <= PMAX,
@@ -201,6 +242,19 @@ def ni_nc_matmul(a: Tile, b: Tile) -> Tile:
     assert a.d1 <= GEMM_STATIONARY_FMAX
     assert b.d1 <= GEMM_MOVING_FMAX
     return Tile(a.d1, b.d1, DT_F32, BUF_PSUM)
+
+# nisa.nc_matmul(dst, a, b): explicit-destination form (matrix_multiplication
+# tutorial). dst must live in PSUM with the matmul output shape; same
+# hardware shape limits as ni_nc_matmul.
+def nisa_nc_matmul(dst: Tile, a: Tile, b: Tile) -> None:
+    assert a.d0 == b.d0
+    assert a.dtype == b.dtype
+    assert a.d0 <= PMAX
+    assert a.d1 <= GEMM_STATIONARY_FMAX
+    assert b.d1 <= GEMM_MOVING_FMAX
+    assert dst.d0 == a.d1
+    assert dst.d1 == b.d1
+    assert dst.buffer == BUF_PSUM
 
 # ============================================================== Accumulation / reduction
 

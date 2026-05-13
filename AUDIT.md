@@ -178,3 +178,30 @@ This is the highest-stakes audit finding to date — it reveals that the
 trusted base must capture the *correlation* between index variables, not
 just their individual value ranges. Future stubs that combine indices
 must follow the same pattern.
+
+---
+
+## Finding 9 — `nisa_tensor_copy` over-strict dtype contract
+
+Surfaced when porting `matrix_multiplication/nki_matmul_basic_`. Initial
+`nisa_tensor_copy` asserted `dst.dtype == src.dtype`. The tutorial uses
+the instruction to cast a PSUM fp32 result into an SBUF fp16 result —
+the well-formed kernel produced `VERIFICATION FAILED` on the dtype
+equality assertion.
+
+**Root cause**: NKI's `nisa.tensor_copy` is the standard way to perform
+a same-shape dtype conversion. The strict equality contract was always
+too strong for this primitive; we just had not encountered a kernel
+that exercised the cast form until the basic-matmul tutorial.
+
+**Resolution**: relaxed `nisa_tensor_copy` to require shape equality
+only, with an explicit comment that the instruction doubles as a cast.
+All existing kernels that previously used `nisa_tensor_copy` (transpose2d
+good / buggy) used same-dtype copy and remain unaffected.
+
+This is the second contract-tightness incident exposed by a tutorial
+port — and it is the kind of error that would have silently shipped
+under the old single-file structure (each copy of the stub library
+would have had its own strict equality check; tightening one would not
+have caught the issue in the others). The canonical-stubs structure
+plus end-to-end `make verify` is exactly the workflow that surfaces it.
