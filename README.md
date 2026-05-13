@@ -157,11 +157,19 @@ kernel here is the original NKI source rewritten through three uniform
 local transformations:
 
 - `for x in nl.affine_range(n)` → `while x < n: ...; x += 1`
+  ([esbmc/esbmc#4516](https://github.com/esbmc/esbmc/issues/4516):
+  iterating an alias or wrapper of `range` does not parse)
 - `a[i:j, k:l]` → `slice2d(a, i, j, k, l)`
+  ([esbmc/esbmc#4514](https://github.com/esbmc/esbmc/issues/4514):
+  user-defined `__getitem__` triggers an internal assertion failure)
 - shape destructuring `M, N = a.shape` → `M = a.d0; N = a.d1`
+  ([esbmc/esbmc#4515](https://github.com/esbmc/esbmc/issues/4515):
+  tuple unpacking fails when the source is a class attribute or
+  parameter typed as `tuple`)
 
 These rewrites preserve control flow and index arithmetic verbatim and are
-the natural target for an `ast`-based pre-pass in a scaled-up version.
+the natural target for an `ast`-based pre-pass in a scaled-up version. If
+the three upstream issues land, each rewrite retires.
 
 ## Contributed kernels: status
 
