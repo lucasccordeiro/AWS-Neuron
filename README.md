@@ -38,73 +38,67 @@ pinpointing the violated contract.
 
 ```
 .
-├── stubs.py          # CANONICAL stub library — single source of truth
-├── kernels/          # Ported NKI kernels (one per file, no stubs, no harness)
-├── harness/          # Concrete or symbolic drivers (one per build target)
-├── build.py          # Manifest of (kernel, harness, ESBMC args, expected verdict)
-├── Makefile          # `make build` / `make verify` / `make clean`
-├── AUDIT.md          # Pre-refactor audit of the original duplicated stubs
-└── build/            # AUTO-GENERATED: stubs + kernel + harness concatenated;
-                     # this is what ESBMC actually runs. Gitignored.
+├── verify.py           # manifest of (entry script, ESBMC args, expected verdict)
+├── Makefile            # `make verify`
+├── AUDIT.md            # canonical-stubs audit + per-port stub-correctness findings
+└── harness/            # everything ESBMC sees
+    ├── stubs.py        # canonical stub library — single source of truth
+    ├── kernels/        # ported NKI kernels, each `from stubs import *`
+    │   └── <name>.py
+    └── verify_<name>.py    # entry scripts; import stubs + kernels.<name>
 ```
 
-Why a build step? ESBMC 8.2.0's Python frontend does not resolve transitive
-imports through an intermediate module: a harness file that imports a kernel
-file that imports `stubs.py` will fail to bind the stub symbols at kernel-call
-sites. So the build step concatenates `stubs.py` + the kernel file + the
-harness file into a single ESBMC-ready artifact under `build/`. The
-non-concatenated sources remain the authoritative editable form; everything
-in `build/` is regenerated from them.
+ESBMC's Python frontend searches the entry script's directory for modules,
+so `stubs.py` and `kernels/` live next to the `verify_*.py` entry scripts
+under `harness/`. Each entry script imports the stub names and the kernel
+function it exercises, sets up concrete (or nondet) input shapes, and
+asserts the kernel's output contract.
 
-A single ESBMC limitation is the entire reason for the build step. If
-[the upstream issue](https://github.com/esbmc/esbmc/issues/4509) gets fixed, the
-Makefile collapses to a few imports and the build step retires.
-
-A second ESBMC Python-frontend bug — silent JSON-type-error crash on bare
-`var: int` annotations inside `while` bodies — surfaced during the
-interpolate_bilinear port and is filed as
-[esbmc/esbmc#4510](https://github.com/esbmc/esbmc/issues/4510). The
-workaround is to initialise every such variable; all the loop-local
-conditional bindings in `interpolate_*` apply it.
+The `verify_` prefix on entry scripts is a deliberate disambiguation: at
+the unqualified-module-name level (e.g. `tensor_add`) ESBMC's Python
+frontend currently segfaults when the entry script and an imported kernel
+module share the same name. We file this as a separate upstream issue;
+the prefix keeps both modules distinct in the meantime.
 
 ## Targets
 
-| Build target | Kernel | Harness | Expected |
+| Target | Entry script (harness/) | Kernel module | Expected |
 |---|---|---|---|
-| `tensor_add` | `kernels/tensor_add.py` | `harness/tensor_add.py` | `SUCCESSFUL` |
-| `tensor_add_buggy` | `kernels/tensor_add_buggy.py` | `harness/tensor_add_buggy.py` | `FAILED` |
-| `tensor_add_symbolic` | `kernels/tensor_add.py` | `harness/tensor_add_symbolic.py` | `SUCCESSFUL` (`--unwind 6`) |
-| `transpose2d` | `kernels/transpose2d.py` | `harness/transpose2d.py` | `SUCCESSFUL` |
-| `transpose2d_buggy` | `kernels/transpose2d_buggy.py` | `harness/transpose2d_buggy.py` | `FAILED` |
-| `matmul` | `kernels/matmul.py` | `harness/matmul.py` | `SUCCESSFUL` |
-| `matmul_big` | `kernels/matmul.py` | `harness/matmul_big.py` | `SUCCESSFUL` |
-| `matmul_buggy` | `kernels/matmul_buggy.py` | `harness/matmul_buggy.py` | `FAILED` |
-| `maxpooling` | `kernels/maxpooling.py` | `harness/maxpooling.py` | `SUCCESSFUL` |
-| `maxpooling_buggy` | `kernels/maxpooling_buggy.py` | `harness/maxpooling_buggy.py` | `FAILED` |
-| `interpolate_bilinear` | `kernels/interpolate_bilinear.py` | `harness/interpolate_bilinear.py` | `SUCCESSFUL` |
-| `interpolate_bilinear_buggy` | `kernels/interpolate_bilinear_buggy.py` | `harness/interpolate_bilinear_buggy.py` | `FAILED` |
-| `interpolate_trilinear` | `kernels/interpolate_trilinear.py` | `harness/interpolate_trilinear.py` | `SUCCESSFUL` |
-| `interpolate_trilinear_buggy` | `kernels/interpolate_trilinear_buggy.py` | `harness/interpolate_trilinear_buggy.py` | `FAILED` |
-| `matmul_basic` | `kernels/matmul_basic.py` | `harness/matmul_basic.py` | `SUCCESSFUL` |
-| `matmul_basic_buggy` | `kernels/matmul_basic_buggy.py` | `harness/matmul_basic_buggy.py` | `FAILED` |
-| `mamba_v1` | `kernels/mamba_v1.py` | `harness/mamba_v1.py` | `SUCCESSFUL` |
-| `mamba_v1_buggy` | `kernels/mamba_v1_buggy.py` | `harness/mamba_v1_buggy.py` | `FAILED` |
+| `tensor_add` | `verify_tensor_add.py` | `kernels/tensor_add.py` | `SUCCESSFUL` |
+| `tensor_add_buggy` | `verify_tensor_add_buggy.py` | `kernels/tensor_add_buggy.py` | `FAILED` |
+| `tensor_add_symbolic` | `verify_tensor_add_symbolic.py` | `kernels/tensor_add.py` | `SUCCESSFUL` (`--unwind 6`) |
+| `transpose2d` | `verify_transpose2d.py` | `kernels/transpose2d.py` | `SUCCESSFUL` |
+| `transpose2d_buggy` | `verify_transpose2d_buggy.py` | `kernels/transpose2d_buggy.py` | `FAILED` |
+| `matmul` | `verify_matmul.py` | `kernels/matmul.py` | `SUCCESSFUL` |
+| `matmul_big` | `verify_matmul_big.py` | `kernels/matmul.py` | `SUCCESSFUL` |
+| `matmul_buggy` | `verify_matmul_buggy.py` | `kernels/matmul_buggy.py` | `FAILED` |
+| `maxpooling` | `verify_maxpooling.py` | `kernels/maxpooling.py` | `SUCCESSFUL` |
+| `maxpooling_buggy` | `verify_maxpooling_buggy.py` | `kernels/maxpooling_buggy.py` | `FAILED` |
+| `interpolate_bilinear` | `verify_interpolate_bilinear.py` | `kernels/interpolate_bilinear.py` | `SUCCESSFUL` |
+| `interpolate_bilinear_buggy` | `verify_interpolate_bilinear_buggy.py` | `kernels/interpolate_bilinear_buggy.py` | `FAILED` |
+| `interpolate_trilinear` | `verify_interpolate_trilinear.py` | `kernels/interpolate_trilinear.py` | `SUCCESSFUL` |
+| `interpolate_trilinear_buggy` | `verify_interpolate_trilinear_buggy.py` | `kernels/interpolate_trilinear_buggy.py` | `FAILED` |
+| `matmul_basic` | `verify_matmul_basic.py` | `kernels/matmul_basic.py` | `SUCCESSFUL` |
+| `matmul_basic_buggy` | `verify_matmul_basic_buggy.py` | `kernels/matmul_basic_buggy.py` | `FAILED` |
+| `mamba_v1` | `verify_mamba_v1.py` | `kernels/mamba_v1.py` | `SUCCESSFUL` |
+| `mamba_v1_buggy` | `verify_mamba_v1_buggy.py` | `kernels/mamba_v1_buggy.py` | `FAILED` |
 
-The `build.py` manifest is the single source of truth for these pairings,
-the ESBMC flags, and the expected verdicts.
+`verify.py` is the single source of truth for these pairings, the ESBMC
+flags, and the expected verdicts.
 
 ## How to run
 
-Requires ESBMC 8.2.0 or later with the Python frontend.
+Requires ESBMC 8.2.0 or later with the Python frontend (transitive-import
+support landed in [esbmc/esbmc#4512](https://github.com/esbmc/esbmc/pull/4512);
+the bare-annotation fix in [esbmc/esbmc#4511](https://github.com/esbmc/esbmc/pull/4511)).
 
 ```bash
-make verify           # build, run ESBMC on every target, tally results
-make build            # regenerate build/*.py only
-make clean            # remove build/
+make verify              # run ESBMC on every target, tally results
+python3 verify.py NAME   # run a single target
 ```
 
 Each target completes in 1–3 seconds wall-clock on a stock laptop; the full
-suite (8 targets) finishes in under 15 seconds.
+suite (18 targets) finishes in well under 30 seconds.
 
 ## Stub-library scope
 
@@ -212,20 +206,17 @@ Deferred:
 
 ## What still does not work
 
-- **Concrete shapes only at the top level.** The symbolic variant works,
-  but the unwind bound has to be set by hand. k-induction would lift the
-  bound but has not been wired up here.
-- **No fancy indexing.** `nl.mgrid` + broadcast-index loads/stores
-  (`maxpooling.py`, both `interpolate_*`, parts of `pipelined_attention.py`,
-  `attention_fwd_performance`, `mxfp-matmul`) are out of scope until those
-  stubs are written.
+- **Concrete shapes only at the top level (with one symbolic exception).**
+  The `tensor_add_symbolic` target sweeps km, kn in [1, 4]; everything
+  else uses concrete shapes. k-induction would lift the unwind bound but
+  has not been wired up here.
 - **Float semantics are unused.** Only int-typed shape arithmetic enters
   the SMT problem. Dtypes are opaque tags.
-- **Stub correctness is itself a hypothesis.** The first run of
-  `tensor_add_good.py` failed because the stub library applied the
-  SBUF-only 128-partition limit to *all* buffers. Every stub contract is
-  a load-bearing assumption that needs validation against the NKI
-  programming guide.
+- **Stub correctness is itself a hypothesis.** Three contract-tightness
+  incidents have already surfaced during ports (AUDIT.md Findings 8 and 9
+  plus the original SBUF-only 128-partition incident from the initial
+  tensor_add run). Every stub contract is a load-bearing assumption that
+  needs validation against the NKI programming guide.
 
 ## Why this is interesting
 

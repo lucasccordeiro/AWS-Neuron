@@ -1,7 +1,9 @@
-# ESBMC upstream issue (filed)
+# ESBMC upstream issue (filed and resolved)
 
 > Filed as https://github.com/esbmc/esbmc/issues/4509 (labels: `python`, `bug`).
-> This file is kept for reference; track status on the issue itself.
+> Fixed by https://github.com/esbmc/esbmc/pull/4512 (merged). The build-step
+> workaround in this repo has been removed; see `verify.py`. This file is
+> kept for the historical reproducer.
 
 ---
 

@@ -1,7 +1,9 @@
-# DRAFT: second ESBMC upstream issue
+# ESBMC upstream issue (filed and resolved)
 
-> Status: not yet filed. Review before posting to
-> https://github.com/esbmc/esbmc/issues/
+> Filed as https://github.com/esbmc/esbmc/issues/4510 (labels: `python`, `bug`).
+> Fixed by https://github.com/esbmc/esbmc/pull/4511 (merged). The
+> initialised-variable workarounds in the `interpolate_*` kernels have been
+> removed. This file is kept for the historical reproducer.
 
 ## Title
 
