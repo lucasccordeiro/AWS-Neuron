@@ -60,6 +60,11 @@ A single ESBMC limitation is the entire reason for the build step. If
 [the upstream issue](https://github.com/esbmc/esbmc/issues/4509) gets fixed, the
 Makefile collapses to a few imports and the build step retires.
 
+A second ESBMC Python-frontend bug (silent JSON-type-error crash on bare
+`var: int` annotations inside `while` bodies) was hit during the
+interpolate_bilinear port; the workaround is to initialise every such
+variable. Draft issue body in `ESBMC_ISSUE_2_DRAFT.md`.
+
 ## Targets
 
 | Build target | Kernel | Harness | Expected |
@@ -72,6 +77,10 @@ Makefile collapses to a few imports and the build step retires.
 | `matmul` | `kernels/matmul.py` | `harness/matmul.py` | `SUCCESSFUL` |
 | `matmul_big` | `kernels/matmul.py` | `harness/matmul_big.py` | `SUCCESSFUL` |
 | `matmul_buggy` | `kernels/matmul_buggy.py` | `harness/matmul_buggy.py` | `FAILED` |
+| `maxpooling` | `kernels/maxpooling.py` | `harness/maxpooling.py` | `SUCCESSFUL` |
+| `maxpooling_buggy` | `kernels/maxpooling_buggy.py` | `harness/maxpooling_buggy.py` | `FAILED` |
+| `interpolate_bilinear` | `kernels/interpolate_bilinear.py` | `harness/interpolate_bilinear.py` | `SUCCESSFUL` |
+| `interpolate_bilinear_buggy` | `kernels/interpolate_bilinear_buggy.py` | `harness/interpolate_bilinear_buggy.py` | `FAILED` |
 
 The `build.py` manifest is the single source of truth for these pairings,
 the ESBMC flags, and the expected verdicts.
@@ -95,6 +104,7 @@ suite (8 targets) finishes in under 15 seconds.
 
 ```
 Tile, Tile3D                        # 2-D and 3-D tiles (d0..d2, dtype, buffer)
+IndexTensor                         # value-range model for mgrid-style indices
 nl_ndarray_2d / _3d                 # allocation; partition-dim limit on SBUF/PSUM
 nl_zeros_2d / _3d                   # zero-initialised allocation
 slice2d, slice_cols                 # view-style slicing
@@ -104,7 +114,25 @@ nisa_dma_copy, _tensor_tensor,      # ISA-level ops with shape + dtype checks
    _tensor_copy
 ni_nc_matmul                        # nc_matmul with par-dim + GEMM FMAX limits
 iadd, nl_loop_reduce                # accumulation in PSUM, loop reduction
+
+# Fancy indexing (mgrid, masked load/store, masked reduction)
+mgrid_axis, index_add, index_add_scalar,
+index_mul_scalar, index_neg_plus_scalar     # index-arithmetic combinators
+nl_load_fancy_2d_to_3d              # masked 2-D fancy load (with base + offset)
+nl_load_fancy_3d_to_3d              # masked 3-D fancy load
+nl_store_fancy_2d, nl_store_fancy_3d # masked fancy store
+nl_max_fancy_3d_to_2d               # masked fancy max reduction
+tile_fancy_access_3d                # bound-check on 3-D fancy access (read/write)
 ```
+
+Fancy-indexing checks use a *nondet representative element* technique:
+each `IndexTensor` carries its `(low, high)` value range, the stub
+introduces a nondet integer constrained to that range, and asserts the
+bound (or mask-implies-bound) on that representative. This is a sound
+abstraction for the bound-check class of properties but does not
+distinguish discrete index values from any integer in the range; see
+AUDIT.md Finding 8 for the correlation pitfall this raises and the
+required design pattern.
 
 The full NKI runtime needs roughly a dozen more such stubs to cover the
 `nki-samples` corpus — reductions (`nl.sum`), elementwise (`nisa.tensor_scalar`),
@@ -130,18 +158,31 @@ the natural target for an `ast`-based pre-pass in a scaled-up version.
 ## Contributed kernels: status
 
 The `contributed/` directory of `aws-neuron/nki-samples` carries
-community-submitted kernels with weaker review than tutorials. The current
-stub library covers `matmul.py` (3-D tile structure, `nl.zeros`,
-`nl.par_dim`, `nl.tile_size.{pmax,gemm_stationary_fmax,gemm_moving_fmax}`,
-`nl.load`/`nl.store` with implicit slicing, `ni.nc_matmul` with hardware
-shape limits, `iadd` accumulation in PSUM, `nl.loop_reduce`). Both the
-small and the larger harness verify cleanly; no bug surfaced.
+community-submitted kernels with weaker review than tutorials. The
+current stub library covers:
 
-The remaining contributed kernels (`maxpooling.py`, `interpolate_*`,
-`pipelined_attention.py`) use `nl.mgrid` plus broadcast-index fancy
-indexing and masked loads/stores. Modelling these requires a different
-stub design (multi-dimensional index tensors with mask predicates) and is
-deferred.
+- `matmul.py` (3-D tile structure, `nl.zeros`, `nl.par_dim`,
+  `nl.tile_size.{pmax,gemm_stationary_fmax,gemm_moving_fmax}`,
+  `nl.load`/`nl.store` with implicit slicing, `ni.nc_matmul` with hardware
+  shape limits, `iadd` accumulation in PSUM, `nl.loop_reduce`).
+- `maxpooling.py` (`nl.mgrid` + masked fancy load + fancy max reduction +
+  masked fancy store; modelled via `IndexTensor` + nondet representative
+  elements — see AUDIT.md Finding 8 for the stub-correctness incident
+  encountered while porting this kernel).
+- `interpolate_bilinear_fwd.py` (3-D HBM fancy load/store, 3-D SBUF fancy
+  accesses for in-place writes to multiple regions of `out_tile`, integer
+  rewrites of `math.ceil` and `max`/`min`).
+
+Deferred:
+
+- `interpolate_trilinear_fwd.py` — same pattern family as bilinear but
+  with 4-D tiles (extra depth axis). Requires Tile4D + a parallel set of
+  4-D fancy-indexing stubs; mechanically similar but doubles the stub
+  surface.
+- `pipelined_attention.py` — uses attention-specific primitives
+  (`ni.nc_matmul` with non-trivial accumulator routing, softmax,
+  scaled-dot-product structure) that go beyond the current
+  shape-and-bounds story. Out of scope for the present stub family.
 
 ## What still does not work
 

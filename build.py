@@ -55,6 +55,17 @@ MANIFEST: list[Target] = [
            (),                     "SUCCESSFUL"),
     Target("matmul_buggy",         "matmul_buggy.py",     "matmul_buggy.py",
            (),                     "FAILED"),
+    Target("maxpooling",           "maxpooling.py",       "maxpooling.py",
+           (),                     "SUCCESSFUL"),
+    Target("maxpooling_buggy",     "maxpooling_buggy.py", "maxpooling_buggy.py",
+           (),                     "FAILED"),
+    Target("interpolate_bilinear", "interpolate_bilinear.py",
+                                                          "interpolate_bilinear.py",
+           (),                     "SUCCESSFUL"),
+    Target("interpolate_bilinear_buggy",
+                                   "interpolate_bilinear_buggy.py",
+                                                          "interpolate_bilinear_buggy.py",
+           (),                     "FAILED"),
 ]
 
 

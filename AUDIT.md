@@ -141,3 +141,40 @@ ESBMC on the post-refactor build artefacts and comparing against the
 pre-refactor results — but each of them could have, if the kernels were
 edited or if new kernels reused the weaker copies. The canonical library
 discharges this risk going forward.
+
+---
+
+## Finding 8 — fancy-load mask predicate (post-refactor)
+
+Surfaced when porting `contributed/maxpooling.py`. Initial design of
+`nl_load_fancy_2d_to_3d` used the *combined* row index as the value
+constrained by the mask predicate. This was a real stub-correctness bug:
+the NKI mask filters on the *base* index axis (e.g. `i_h`), not on the
+post-sum row (e.g. `i_h + i_kh`).
+
+The bug surfaced as a false negative on `maxpooling_buggy.py`: an
+injected too-loose-mask off-by-one returned `VERIFICATION SUCCESSFUL`
+when the bound was provably violated.
+
+**Root cause**: my stub generated nondet (`r`, `c`) representatives for
+the combined row and column, then evaluated `r < mask_max` to decide
+whether the bound check fires. The actual NKI semantics is that the
+mask predicate evaluates on the *base axis value*, and the load row is
+computed as `base_axis + row_offset`. When the mask is true, the bound
+check must hold *for the resulting combined value over all possible
+offset values*, not for a single nondet combined value. Modelling the
+combined value as a single nondet implicitly assumes mask-true elements
+have arbitrary combined values — which over-constrains and lets the bug
+slip through.
+
+**Resolution**: replaced the stub with one that carries the base axis
+and the row-offset axis separately, generates two correlated nondets
+(`m`, `o`), constrains them to their respective index-tensor ranges,
+applies the mask on `m`, and checks the bound on the sum `m + o`. The
+stub now catches the injected bug and rejects the buggy kernel as
+expected.
+
+This is the highest-stakes audit finding to date — it reveals that the
+trusted base must capture the *correlation* between index variables, not
+just their individual value ranges. Future stubs that combine indices
+must follow the same pattern.
