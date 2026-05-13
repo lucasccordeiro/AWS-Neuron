@@ -57,8 +57,9 @@ asserts the kernel's output contract.
 The `verify_` prefix on entry scripts is a deliberate disambiguation: at
 the unqualified-module-name level (e.g. `tensor_add`) ESBMC's Python
 frontend currently segfaults when the entry script and an imported kernel
-module share the same name. We file this as a separate upstream issue;
-the prefix keeps both modules distinct in the meantime.
+module share the same name. Filed as
+[esbmc/esbmc#4513](https://github.com/esbmc/esbmc/issues/4513); the
+prefix keeps both modules distinct in the meantime.
 
 ## Targets
 

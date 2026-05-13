@@ -1,7 +1,8 @@
-# DRAFT: third ESBMC upstream issue
+# ESBMC upstream issue (filed)
 
-> Status: not yet filed. Review before posting to
-> https://github.com/esbmc/esbmc/issues/
+> Filed as https://github.com/esbmc/esbmc/issues/4513 (labels: `python`, `bug`).
+> Awaiting upstream triage. The `verify_<name>.py` prefix on every entry script
+> is the working repo's workaround.
 
 ## Title
 
