@@ -43,6 +43,8 @@ pinpointing the violated contract.
 | `tensor_add_symbolic.py` | `nki_tensor_add` over a *family* of shapes: M = km·128, N = kn·512 for km, kn ∈ [1, 4] | `VERIFICATION SUCCESSFUL` |
 | `transpose2d_good.py` | `tensor_transpose2D_kernel` at P=2, F1=3, F2=4 | `VERIFICATION SUCCESSFUL` |
 | `transpose2d_buggy.py` | Same kernel with `i_f2*sz_f2 + i_f1` (wrong stride) on the destination | `VERIFICATION FAILED` at `slice_cols: c1 <= src.d1` |
+| `matmul_contributed.py` | Community matmul kernel from `contributed/`, harness at NUM_BLOCK_K/M/N = 1 | `VERIFICATION SUCCESSFUL` |
+| `matmul_contributed_big.py` | Same kernel at NUM_BLOCK_K/M/N = 2 (block-interaction across outer loops) | `VERIFICATION SUCCESSFUL` |
 
 ## How to run
 
@@ -54,9 +56,11 @@ esbmc tensor_add_buggy.py
 esbmc --unwind 6 tensor_add_symbolic.py
 esbmc transpose2d_good.py
 esbmc transpose2d_buggy.py
+esbmc matmul_contributed.py
+esbmc matmul_contributed_big.py
 ```
 
-Each run completes in about 1–2 seconds wall-clock on a stock laptop, using
+Each run completes in about 1–3 seconds wall-clock on a stock laptop, using
 the default Bitwuzla solver.
 
 ## Stub-library scope
@@ -94,13 +98,29 @@ local transformations:
 These rewrites preserve control flow and index arithmetic verbatim and are
 the natural target for an `ast`-based pre-pass in a scaled-up version.
 
+## Contributed kernels: status
+
+The `contributed/` directory of `aws-neuron/nki-samples` carries
+community-submitted kernels with weaker review than tutorials. The current
+stub library covers `matmul.py` (3-D tile structure, `nl.zeros`,
+`nl.par_dim`, `nl.tile_size.{pmax,gemm_stationary_fmax,gemm_moving_fmax}`,
+`nl.load`/`nl.store` with implicit slicing, `ni.nc_matmul` with hardware
+shape limits, `iadd` accumulation in PSUM, `nl.loop_reduce`). Both the
+small and the larger harness verify cleanly; no bug surfaced.
+
+The remaining contributed kernels (`maxpooling.py`, `interpolate_*`,
+`pipelined_attention.py`) use `nl.mgrid` plus broadcast-index fancy
+indexing and masked loads/stores. Modelling these requires a different
+stub design (multi-dimensional index tensors with mask predicates) and is
+deferred.
+
 ## What still does not work
 
 - **Concrete shapes only at the top level.** The symbolic variant works,
   but the unwind bound has to be set by hand. k-induction would lift the
   bound but has not been wired up here.
-- **One kernel family at a time.** Reductions and access-pattern views
-  (`Tile.ap`) are not modelled; kernels that use them (most of
+- **No fancy indexing.** `nl.mgrid` + broadcast-index loads/stores
+  (`maxpooling.py`, both `interpolate_*`, parts of `pipelined_attention.py`,
   `attention_fwd_performance`, `mxfp-matmul`) are out of scope until those
   stubs are written.
 - **Float semantics are unused.** Only int-typed shape arithmetic enters
@@ -125,4 +145,5 @@ kernels) and the verifier is fast (sub-second per kernel).
 
 - ESBMC: https://github.com/esbmc/esbmc — 8.2.0, default Bitwuzla solver.
 - NKI samples: https://github.com/aws-neuron/nki-samples — the
-  `tensor_addition` and `transpose2d` tutorials.
+  `tensor_addition` and `transpose2d` tutorials and the `contributed/matmul.py`
+  community kernel.
