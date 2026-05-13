@@ -1,3 +1,6 @@
+# Upstream NKI source (pinned snapshot a87aaa44, Neuron SDK 2.29 / NKI 0.3.0):
+#   https://github.com/aws-neuron/nki-samples/blob/a87aaa44f7b26241bdb152af8838e287669c3947/src/nki_samples/tutorials/tensor_addition/tensor_addition_nki_kernels.py
+#
 # NKI tensor_addition kernel — symbolic-shape harness.
 #
 # Same kernel as tensor_add_good.py, but the input tile counts km, kn are

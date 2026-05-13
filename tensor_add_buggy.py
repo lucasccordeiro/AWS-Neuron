@@ -1,4 +1,10 @@
-# NKI tensor_addition kernel — ESBMC-Python PoC, well-formed variant.
+# Upstream NKI source (pinned snapshot a87aaa44, Neuron SDK 2.29 / NKI 0.3.0):
+#   https://github.com/aws-neuron/nki-samples/blob/a87aaa44f7b26241bdb152af8838e287669c3947/src/nki_samples/tutorials/tensor_addition/tensor_addition_nki_kernels.py
+#
+# This variant injects an off-by-one in one DMA slice to demonstrate the
+# counterexample ESBMC produces. The upstream file is correct as published.
+#
+# NKI tensor_addition kernel — ESBMC-Python PoC, buggy variant.
 #
 # Models nl.ndarray, slicing, nisa.dma_copy, nisa.tensor_tensor as shape-and-
 # bounds-tracking stubs. Each NKI runtime primitive becomes an assert + a

@@ -1,4 +1,11 @@
-# NKI transpose2d kernel — ESBMC-Python PoC, well-formed variant.
+# Upstream NKI source (pinned snapshot a87aaa44, Neuron SDK 2.29 / NKI 0.3.0):
+#   https://github.com/aws-neuron/nki-samples/blob/a87aaa44f7b26241bdb152af8838e287669c3947/src/nki_samples/tutorials/transpose2d/transpose2d_nki_kernels.py
+#
+# This variant injects a wrong-stride bug on the destination column index to
+# demonstrate the counterexample ESBMC produces. The upstream file is
+# correct as published.
+#
+# NKI transpose2d kernel — ESBMC-Python PoC, buggy variant.
 #
 # Original kernel reorders elements along axis 1 of a (sz_p, sz_f1 * sz_f2)
 # tile, treating each row as a flattened F1 x F2 matrix and emitting its
