@@ -24,6 +24,22 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 HARNESS = ROOT / "harness"
 
+# ANSI colours, applied only when stdout is a TTY so log files stay clean.
+_USE_COLOR = sys.stdout.isatty()
+_GREEN  = "\033[32m" if _USE_COLOR else ""
+_RED    = "\033[31m" if _USE_COLOR else ""
+_RESET  = "\033[0m"  if _USE_COLOR else ""
+
+
+def _paint(text: str, width: int = 0) -> str:
+    """Left-pad to `width` (visible characters) and wrap in ANSI colour."""
+    padded = text.ljust(width)
+    if text in ("SUCCESSFUL", "PASS"):
+        return f"{_GREEN}{padded}{_RESET}"
+    if text in ("FAILED", "MISMATCH", "ERROR"):
+        return f"{_RED}{padded}{_RESET}"
+    return padded
+
 
 @dataclass(frozen=True)
 class Target:
@@ -80,7 +96,11 @@ def main(argv: list[str]) -> int:
     for t in targets:
         actual, tail = run(t)
         ok = actual == t.expected
-        print(f"{t.name:<28} {t.expected:<12} {actual:<12} {'PASS' if ok else 'MISMATCH'}")
+        result = "PASS" if ok else "MISMATCH"
+        print(f"{t.name:<28} "
+              f"{_paint(t.expected, 12)} "
+              f"{_paint(actual,    12)} "
+              f"{_paint(result)}")
         if not ok:
             failures.append((t, actual, tail))
     print("-" * 72)
