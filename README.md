@@ -84,6 +84,10 @@ prefix keeps both modules distinct in the meantime.
 | `matmul_basic_buggy` | `verify_matmul_basic_buggy.py` | `kernels/matmul_basic_buggy.py` | `FAILED` |
 | `mamba_v1` | `verify_mamba_v1.py` | `kernels/mamba_v1.py` | `SUCCESSFUL` |
 | `mamba_v1_buggy` | `verify_mamba_v1_buggy.py` | `kernels/mamba_v1_buggy.py` | `FAILED` |
+| `transpose2d_symbolic` | `verify_transpose2d_symbolic.py` | `kernels/transpose2d.py` | `SUCCESSFUL` (`--unwind 5`; F1, F2 ∈ [1, 4]) |
+| `maxpooling_symbolic` | `verify_maxpooling_symbolic.py` | `kernels/maxpooling.py` | `SUCCESSFUL` (`--unwind 5`; H = k·128, k ∈ [1, 4]) |
+| `mamba_v1_symbolic` | `verify_mamba_v1_symbolic.py` | `kernels/mamba_v1.py` | `SUCCESSFUL` (`--unwind 5`; state ∈ [1, 4], seq ∈ [2, 8]) |
+| `interpolate_bilinear_symbolic` | `verify_interpolate_bilinear_symbolic.py` | `kernels/interpolate_bilinear.py` | `SUCCESSFUL` (`--unwind 5`; H_src, W_src ∈ {10, 19, 28}) |
 
 `verify.py` is the single source of truth for these pairings, the ESBMC
 flags, and the expected verdicts.
@@ -216,10 +220,16 @@ Deferred:
 
 ## What still does not work
 
-- **Concrete shapes only at the top level (with one symbolic exception).**
-  The `tensor_add_symbolic` target sweeps km, kn in [1, 4]; everything
-  else uses concrete shapes. k-induction would lift the unwind bound but
-  has not been wired up here.
+- **Most targets use concrete shapes.** Five symbolic-shape targets
+  exist (`tensor_add_symbolic`, `transpose2d_symbolic`,
+  `maxpooling_symbolic`, `mamba_v1_symbolic`, `interpolate_bilinear_symbolic`)
+  — each sweeps a small bounded family of legal shapes via
+  `nondet_int` + `__ESBMC_assume` and verifies under `--unwind 5` or 6.
+  `interpolate_trilinear` and the `matmul` family are not symbolicised:
+  trilinear's nested-fancy-access state would balloon, matmul has six
+  nested loops that push BMC unwinding hard, and `matmul_basic` hardcodes
+  its dimensions in the kernel's own asserts. k-induction would lift the
+  unwind bound but has not been wired up here.
 - **Float semantics are unused.** Only int-typed shape arithmetic enters
   the SMT problem. Dtypes are opaque tags.
 - **Stub correctness is itself a hypothesis.** Three contract-tightness

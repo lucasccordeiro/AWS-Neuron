@@ -68,6 +68,11 @@ MANIFEST: list[Target] = [
     Target("matmul_basic_buggy",         "verify_matmul_basic_buggy.py",         (),                "FAILED"),
     Target("mamba_v1",                   "verify_mamba_v1.py",                   (),                "SUCCESSFUL"),
     Target("mamba_v1_buggy",             "verify_mamba_v1_buggy.py",             (),                "FAILED"),
+    Target("transpose2d_symbolic",       "verify_transpose2d_symbolic.py",       ("--unwind", "5"), "SUCCESSFUL"),
+    Target("maxpooling_symbolic",        "verify_maxpooling_symbolic.py",        ("--unwind", "5"), "SUCCESSFUL"),
+    Target("mamba_v1_symbolic",          "verify_mamba_v1_symbolic.py",          ("--unwind", "5"), "SUCCESSFUL"),
+    Target("interpolate_bilinear_symbolic", "verify_interpolate_bilinear_symbolic.py",
+                                                                                 ("--unwind", "5"), "SUCCESSFUL"),
 ]
 
 
