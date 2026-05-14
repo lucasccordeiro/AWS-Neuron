@@ -77,6 +77,8 @@ MANIFEST: list[Target] = [
     Target("matmul_tiled_buggy",         "matmul_tiled_buggy.py",                (),                "FAILED"),
     Target("matmul_hoist_load",          "matmul_hoist_load.py",                 (),                "SUCCESSFUL"),
     Target("matmul_hoist_load_buggy",    "matmul_hoist_load_buggy.py",           (),                "FAILED"),
+    Target("matmul_hoist_load_historical",
+                                         "matmul_hoist_load_historical.py",      (),                "FAILED"),
     Target("matmul_block_free",          "matmul_block_free.py",                 (),                "SUCCESSFUL"),
     Target("matmul_block_free_buggy",    "matmul_block_free_buggy.py",           (),                "FAILED"),
     Target("matmul_fully_optimized",     "matmul_fully_optimized.py",            (),                "SUCCESSFUL"),

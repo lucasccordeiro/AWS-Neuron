@@ -12,6 +12,10 @@ assumes familiarity with the verifier but not with NKI.
   wall-clock on Bitwuzla.
 - **6 ESBMC Python-frontend issues filed upstream**, 2 already
   fixed-and-merged (#4509, #4510). 4 still open (#4513–#4516).
+- **1 real upstream bug caught retroactively** —
+  [aws-neuron/nki-samples#74](https://github.com/aws-neuron/nki-samples/pull/74)
+  (pre-fix `nki_matmul_hoist_load_` allocated lhsT slab with the wrong
+  free-dim); reproduced as the `matmul_hoist_load_historical` target.
 - **3 stub-correctness incidents (AUDIT.md Findings 8, 9 and 10)** caught by
   the verifier on the first run of a freshly ported kernel — both would
   have shipped silently in the original per-file duplicated-stubs layout.
@@ -125,6 +129,32 @@ index arithmetic, but the Python-level surface has converged on the
 upstream NKI form. One source rewrite remains active (`slice2d`), and
 it retires when [esbmc/esbmc#4523](https://github.com/esbmc/esbmc/issues/4523)
 closes.
+
+## Real upstream bug caught retroactively
+
+Surveying the `aws-neuron/nki-samples` git history for past bug-fix
+commits surfaced one that our verifier catches end-to-end:
+[PR #74 — *matmul sbuf allocation dimension fix*](https://github.com/aws-neuron/nki-samples/pull/74).
+The pre-fix `nki_matmul_hoist_load_` allocated `lhsT_tiles` with
+free-dim `TILE_N` (=512, the moving FMAX) when it should have used
+`TILE_M` (=128, the stationary FMAX), then loaded a `(TILE_K, TILE_M)`
+slice into a `(TILE_K, TILE_N)` slab. Real shape mismatch; fixed
+upstream after the bug shipped.
+
+Applied to the pre-fix kernel, our `slab_set` stub fires its
+`value.d1 == t.d2` assertion (128 ≠ 512) and produces a precise
+counterexample. The target `matmul_hoist_load_historical` is now in
+the regression suite as a permanent demonstration: if a regression
+ever reintroduced the same class of allocation-vs-load shape
+mismatch, the suite would catch it before merge.
+
+One historical fix is *not* caught:
+[PR #89](https://github.com/aws-neuron/nki-samples/pull/89) (using
+`TILE_K` where `TILE_M` was meant in the result-pack store). On
+NeuronCore both happen to equal 128, so the value coincidence hides
+the wrong-axis use from a shape-and-bounds checker. This is exactly
+the "stub-correctness vs. semantic-correctness" boundary the soundness
+section of `REPORT.md` calls out.
 
 ## Stub-correctness incidents (AUDIT.md)
 

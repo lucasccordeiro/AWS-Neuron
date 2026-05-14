@@ -63,6 +63,7 @@ asserts the kernel's output contract.
 | `matmul_tiled_buggy` | `matmul_tiled_buggy.py` | `kernels/matmul_tiled_buggy.py` | `FAILED` |
 | `matmul_hoist_load` | `matmul_hoist_load.py` | `kernels/matmul_hoist_load.py` | `SUCCESSFUL` |
 | `matmul_hoist_load_buggy` | `matmul_hoist_load_buggy.py` | `kernels/matmul_hoist_load_buggy.py` | `FAILED` |
+| `matmul_hoist_load_historical` | `matmul_hoist_load_historical.py` | `kernels/matmul_hoist_load_historical.py` | `FAILED` — reproduces the pre-fix bug from upstream [aws-neuron/nki-samples#74](https://github.com/aws-neuron/nki-samples/pull/74) |
 | `matmul_block_free` | `matmul_block_free.py` | `kernels/matmul_block_free.py` | `SUCCESSFUL` |
 | `matmul_block_free_buggy` | `matmul_block_free_buggy.py` | `kernels/matmul_block_free_buggy.py` | `FAILED` |
 | `matmul_fully_optimized` | `matmul_fully_optimized.py` | `kernels/matmul_fully_optimized.py` | `SUCCESSFUL` |
