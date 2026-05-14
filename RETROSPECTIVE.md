@@ -89,7 +89,8 @@ Catalogued at a glance to show breadth:
 | [#4515](https://github.com/esbmc/esbmc/issues/4515) | **RESOLVED** ([PR #4524](https://github.com/esbmc/esbmc/pull/4524)) | tuple unpack fails when source is class attribute or `tuple`-typed parameter | retired in 6 kernels; interpolate kernels gated by follow-on [#4532](https://github.com/esbmc/esbmc/issues/4532) |
 | [#4532](https://github.com/esbmc/esbmc/issues/4532) | OPEN | destructured tuple-attr variable not visible in arithmetic if-condition inside for-loop body | keeps `M = a.d0; N = a.d1` form in the two interpolate kernels |
 | [#4516](https://github.com/esbmc/esbmc/issues/4516) | **RESOLVED** ([PR #4521](https://github.com/esbmc/esbmc/pull/4521)) | `for`-loop over an alias of `range` or a function returning `range` fails | retired the `while`-loop rewrite; native `for` loops back in kernels |
-| [#4525](https://github.com/esbmc/esbmc/issues/4525) | OPEN | range-alias / wrapper rewriter doesn't propagate across module imports | one-line `nl_affine_range = range` rebind per kernel |
+| [#4525](https://github.com/esbmc/esbmc/issues/4525) | **RESOLVED** ([PR #4529](https://github.com/esbmc/esbmc/pull/4529)) | range-alias / wrapper rewriter doesn't propagate across module imports | name resolution lands; iteration-count loss is the follow-on |
+| [#4533](https://github.com/esbmc/esbmc/issues/4533) | OPEN | cross-module range alias resolves but loses iteration-count info (unbounded unwinding) | keeps the per-kernel `nl_affine_range = range` rebind |
 
 The four open issues all have minimal repros in their bodies and would,
 collectively, retire every remaining concession the PoC makes against

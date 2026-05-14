@@ -167,8 +167,12 @@ local transformations:
   rewrite (esbmc/esbmc#4516, iterating an alias/wrapper of `range` failed),
   retired after [PR #4521](https://github.com/esbmc/esbmc/pull/4521).
   Each kernel still carries a one-line `nl_affine_range = range` rebind
-  because the same-file pre-pass does not yet propagate across module
-  imports ([esbmc/esbmc#4525](https://github.com/esbmc/esbmc/issues/4525)).
+  even though esbmc/esbmc#4525 (cross-module name resolution) is now
+  closed by [PR #4529](https://github.com/esbmc/esbmc/pull/4529): the
+  cross-module-propagated alias resolves correctly but loses the
+  iteration-count information that an in-file rewrite preserves, so
+  the loop unwinds unboundedly without the local rebind
+  ([esbmc/esbmc#4533](https://github.com/esbmc/esbmc/issues/4533)).
 - `a[i:j, k:l]` → `slice2d(a, i, j, k, l)`
   (originally [esbmc/esbmc#4514](https://github.com/esbmc/esbmc/issues/4514),
   the `__getitem__` assertion crash — resolved by

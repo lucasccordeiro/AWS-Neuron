@@ -8,7 +8,7 @@
 #   - the final reshape((n, c, h_dst, w_dst)) is omitted; PoC checks 3-D output
 
 from stubs import *
-nl_affine_range = range  # in-file rebind so the same-module range-alias pre-pass (esbmc/esbmc#4521) fires
+nl_affine_range = range  # local rebind: cross-module-propagated alias loses iteration-count info (esbmc/esbmc#4533)
 
 def interpolate_bilinear_2x_fwd(src_arr: Tile3D, chunk_size: int) -> Tile3D:
     # NOTE: per-axis assignment instead of `nc, h_src, w_src = src_arr.shape`

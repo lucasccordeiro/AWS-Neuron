@@ -9,7 +9,7 @@
 #   - the final reshape((n, c, d_dst, h_dst, w_dst)) is omitted
 
 from stubs import *
-nl_affine_range = range  # in-file rebind so the same-module range-alias pre-pass (esbmc/esbmc#4521) fires
+nl_affine_range = range  # local rebind: cross-module-propagated alias loses iteration-count info (esbmc/esbmc#4533)
 
 def interpolate_trilinear_2x_fwd(src_arr: Tile4D, chunk_size: int) -> Tile4D:
     # NOTE: per-axis assignment instead of `nc, d_src, h_src, w_src = src_arr.shape`

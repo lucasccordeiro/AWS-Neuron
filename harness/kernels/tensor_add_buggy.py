@@ -5,7 +5,7 @@
 # slice. The upstream file is correct as published.
 
 from stubs import *
-nl_affine_range = range  # in-file rebind so the same-module range-alias pre-pass (esbmc/esbmc#4521) fires
+nl_affine_range = range  # local rebind: cross-module-propagated alias loses iteration-count info (esbmc/esbmc#4533)
 
 def nki_tensor_add(a_input: Tile, b_input: Tile) -> Tile:
     M, N = a_input.shape
