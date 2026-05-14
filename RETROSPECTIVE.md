@@ -6,10 +6,11 @@ assumes familiarity with the verifier but not with NKI.
 
 ## TL;DR
 
-- **13 NKI kernel families ported**, 34 build targets (concrete +
-  positive-control + 5 symbolic-shape variants), 100 % pass rate
-  against expected verdicts; full regression in about 4 minutes
-  wall-clock on Bitwuzla.
+- **15 NKI kernel functions ported** (across 9 upstream source files —
+  5 tutorials, 4 community-`contributed/` kernels), 37 build targets
+  (concrete + positive-control + 5 symbolic-shape variants + 1
+  historical-bug reproduction), 100 % pass rate against expected
+  verdicts; full regression in about 4 minutes wall-clock on Bitwuzla.
 - **6 ESBMC Python-frontend issues filed upstream**, 2 already
   fixed-and-merged (#4509, #4510). 4 still open (#4513–#4516).
 - **1 real upstream bug caught retroactively** —
@@ -49,27 +50,32 @@ filed ESBMC issue (#4514–#4516).
 | Upstream NKI file | Where | Outcome |
 |---|---|---|
 | `tutorials/tensor_addition/tensor_addition_nki_kernels.py` | tutorials | good + buggy + symbolic-shape |
-| `tutorials/transpose2d/transpose2d_nki_kernels.py` | tutorials | good + buggy |
-| `tutorials/matrix_multiplication/matrix_multiplication_nki_kernels.py::nki_matmul_basic_` | tutorials | good + buggy |
-| `tutorials/fused_mamba/mamba_nki_kernels.py::mamba_v1` | tutorials | good + buggy |
+| `tutorials/transpose2d/transpose2d_nki_kernels.py` | tutorials | good + buggy + symbolic-shape |
+| `tutorials/matrix_multiplication/matrix_multiplication_nki_kernels.py` (all five variants: basic / tiled / hoist_load / block_free / fully_optimized) | tutorials | good + buggy each; plus `matmul_hoist_load_historical` reproducing pre-fix bug from nki-samples#74 |
+| `tutorials/fused_mamba/mamba_nki_kernels.py` (v1 / v2 / v3) | tutorials | good + buggy each; v1 also symbolic-shape |
+| `tutorials/average_pool2d/average_pool2d_nki_kernels.py` | tutorials | good + buggy (introduces `Tile5D`, `tile3d_ap_5d`) |
 | `contributed/matmul.py` | community | good (two sizes) + buggy |
-| `contributed/maxpooling.py` | community | good + buggy |
-| `contributed/interpolate_bilinear_fwd.py` | community | good + buggy |
+| `contributed/maxpooling.py` | community | good + buggy + symbolic-shape |
+| `contributed/interpolate_bilinear_fwd.py` | community | good + buggy + symbolic-shape |
 | `contributed/interpolate_trilinear_fwd.py` | community | good + buggy |
 | `contributed/pipelined_attention.py` | community | deferred (attention-specific primitives) |
-| `tutorials/{average_pool2d, mxfp-matmul, attention_fwd_performance}` | tutorials | not attempted |
+| `tutorials/{mxfp-matmul, attention_fwd_performance}` | tutorials | not attempted |
 
 ## Stub library surface
 
 Catalogued at a glance to show breadth:
 
-- **Types**: `Tile`, `Tile3D`, `Tile4D`, `IndexTensor`
-- **Allocation**: `nl_ndarray_{2d,3d,4d}`, `nl_zeros_{2d,3d,4d}`
+- **Types**: `Tile`, `Tile3D`, `Tile4D`, `Tile5D`, `IndexTensor`
+- **Allocation**: `nl_ndarray_{2d,3d,4d,5d}`, `nl_zeros_{2d,3d,4d}`
 - **Slicing (view)**: `slice2d`, `slice_cols`, `slice_3d_at`
 - **Load/store (implicit slice)**: `nl_load_2d`, `nl_store_2d`
 - **3-D indexing for matmul-style layouts**: `slab_get/set`, `slab_cols_get/set`
-- **ISA-level ops**: `nisa_dma_copy`, `nisa_tensor_tensor`, `nisa_tensor_copy`,
-  `nisa_activation`, `nisa_tensor_tensor_scan`
+- **ISA-level ops**: `nisa_dma_copy`, `nisa_dma_copy_3d`,
+  `nisa_tensor_tensor`, `nisa_tensor_copy`, `nisa_tensor_scalar_3d`,
+  `nisa_activation`, `nisa_tensor_tensor_scan`, `nisa_memset`
+- **Access-pattern views**: `tile3d_ap_5d` (constant-stride 5-D view
+  of a 3-D tile, with `Σ stride · (count−1) < src_volume` bound),
+  `nl_sum_5d_axes34_to_3d` (reduction)
 - **Matmul**: `ni_nc_matmul` (returning form), `nisa_nc_matmul`
   (explicit-destination form) — with par-dim ≤ PMAX and GEMM-FMAX limits
 - **Accumulation / reduction**: `iadd` (PSUM), `nl_loop_reduce`,

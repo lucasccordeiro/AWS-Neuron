@@ -37,15 +37,21 @@ added during the `fully_optimized` port; two existing stubs relaxed
 
 +12 build targets. Total: 34.
 
-## Tier 2 — one new stub
+## Tier 2 — one new stub (DONE)
 
-| Module | New stub(s) | Effort |
+| Module | New stub(s) | Status |
 |---|---|---|
-| `tutorials/average_pool2d` | `nl.ap()` (constant-stride multi-axis view of a tile, per-axis `[stride, count]` pairs) | ~75 min |
+| `tutorials/average_pool2d` | `Tile5D`, `nl_ndarray_5d`, `tile3d_ap_5d` (constant-stride multi-axis view), `nl_sum_5d_axes34_to_3d`, `nisa_dma_copy_3d`, `nisa_tensor_scalar_3d` | ✅ |
 
-Worth adding because `.ap()` shows up in other kernels too. Distinct
-abstraction from `mgrid` (constant-stride view vs broadcast-index
-tensor) so it earns its own slot in the stub library.
++2 build targets. Total: 37. The `.ap()` contract is shape-and-bounds:
+each axis is a (stride, count) pair, and the maximum reachable flat
+offset `sum_k stride_k * (count_k - 1)` must be strictly less than the
+source's element count. The view's partition-axis count is also
+limited to PMAX when the source lives in SBUF/PSUM. The contract does
+*not* verify that the strides correspond to a meaningful reshape —
+only that every element accessed via the view is inside the source's
+allocation. Sound for catching stride/count off-by-ones and overflow;
+silent on transpositions that happen to preserve total volume.
 
 ## Tier 3 — new primitive family
 
@@ -81,8 +87,7 @@ Skip unless dtype modelling becomes a goal.
 ## Per-tier blockers (today)
 
 - **Tier 1**: nothing.
-- **Tier 2**: `.ap()` is the only new primitive. Designable as a
-  structural extension of `slice2d`.
+- **Tier 2**: nothing.
 - **Tier 3**: each new primitive is its own design decision (in
   particular, how much of the softmax chain to expose as one stub
   vs several).
@@ -93,6 +98,6 @@ Skip unless dtype modelling becomes a goal.
 | Through | Targets | Status |
 |---|---|---|
 | Tier 1 | 34 | **DONE** |
-| Tier 1 + Tier 2 | 36 | pending |
-| Tier 1 + Tier 2 + Tier 3 pilot | 38 | pending |
-| All of Tier 3 (incl. pipelined_attention) | ~42 | pending |
+| Tier 1 + Tier 2 | 37 | **DONE** (incl. PR #74 historical-bug repro) |
+| Tier 1 + Tier 2 + Tier 3 pilot | 39 | pending |
+| All of Tier 3 (incl. pipelined_attention) | ~43 | pending |
