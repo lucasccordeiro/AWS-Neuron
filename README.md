@@ -46,48 +46,44 @@ pinpointing the violated contract.
     ├── stubs.py        # canonical stub library — single source of truth
     ├── kernels/        # ported NKI kernels, each `from stubs import *`
     │   └── <name>.py
-    └── verify_<name>.py    # entry scripts; import stubs + kernels.<name>
+    └── <name>.py       # entry scripts; import stubs + kernels.<name>
 ```
 
 ESBMC's Python frontend searches the entry script's directory for modules,
-so `stubs.py` and `kernels/` live next to the `verify_*.py` entry scripts
-under `harness/`. Each entry script imports the stub names and the kernel
+so `stubs.py` and `kernels/` live next to the entry scripts under
+`harness/`. Each entry script imports the stub names and the kernel
 function it exercises, sets up concrete (or nondet) input shapes, and
-asserts the kernel's output contract.
-
-The `verify_` prefix on entry scripts is a deliberate disambiguation: at
-the unqualified-module-name level (e.g. `tensor_add`) ESBMC's Python
-frontend currently segfaults when the entry script and an imported kernel
-module share the same name. Filed as
-[esbmc/esbmc#4513](https://github.com/esbmc/esbmc/issues/4513); the
-prefix keeps both modules distinct in the meantime.
+asserts the kernel's output contract. Entry scripts and the matching
+kernel modules share the same basename (`harness/tensor_add.py` ↔
+`harness/kernels/tensor_add.py`); the frontend disambiguates them by
+their qualified module paths.
 
 ## Targets
 
 | Target | Entry script (harness/) | Kernel module | Expected |
 |---|---|---|---|
-| `tensor_add` | `verify_tensor_add.py` | `kernels/tensor_add.py` | `SUCCESSFUL` |
-| `tensor_add_buggy` | `verify_tensor_add_buggy.py` | `kernels/tensor_add_buggy.py` | `FAILED` |
-| `tensor_add_symbolic` | `verify_tensor_add_symbolic.py` | `kernels/tensor_add.py` | `SUCCESSFUL` (`--unwind 6`) |
-| `transpose2d` | `verify_transpose2d.py` | `kernels/transpose2d.py` | `SUCCESSFUL` |
-| `transpose2d_buggy` | `verify_transpose2d_buggy.py` | `kernels/transpose2d_buggy.py` | `FAILED` |
-| `matmul` | `verify_matmul.py` | `kernels/matmul.py` | `SUCCESSFUL` |
-| `matmul_big` | `verify_matmul_big.py` | `kernels/matmul.py` | `SUCCESSFUL` |
-| `matmul_buggy` | `verify_matmul_buggy.py` | `kernels/matmul_buggy.py` | `FAILED` |
-| `maxpooling` | `verify_maxpooling.py` | `kernels/maxpooling.py` | `SUCCESSFUL` |
-| `maxpooling_buggy` | `verify_maxpooling_buggy.py` | `kernels/maxpooling_buggy.py` | `FAILED` |
-| `interpolate_bilinear` | `verify_interpolate_bilinear.py` | `kernels/interpolate_bilinear.py` | `SUCCESSFUL` |
-| `interpolate_bilinear_buggy` | `verify_interpolate_bilinear_buggy.py` | `kernels/interpolate_bilinear_buggy.py` | `FAILED` |
-| `interpolate_trilinear` | `verify_interpolate_trilinear.py` | `kernels/interpolate_trilinear.py` | `SUCCESSFUL` |
-| `interpolate_trilinear_buggy` | `verify_interpolate_trilinear_buggy.py` | `kernels/interpolate_trilinear_buggy.py` | `FAILED` |
-| `matmul_basic` | `verify_matmul_basic.py` | `kernels/matmul_basic.py` | `SUCCESSFUL` |
-| `matmul_basic_buggy` | `verify_matmul_basic_buggy.py` | `kernels/matmul_basic_buggy.py` | `FAILED` |
-| `mamba_v1` | `verify_mamba_v1.py` | `kernels/mamba_v1.py` | `SUCCESSFUL` |
-| `mamba_v1_buggy` | `verify_mamba_v1_buggy.py` | `kernels/mamba_v1_buggy.py` | `FAILED` |
-| `transpose2d_symbolic` | `verify_transpose2d_symbolic.py` | `kernels/transpose2d.py` | `SUCCESSFUL` (`--unwind 5`; F1, F2 ∈ [1, 4]) |
-| `maxpooling_symbolic` | `verify_maxpooling_symbolic.py` | `kernels/maxpooling.py` | `SUCCESSFUL` (`--unwind 5`; H = k·128, k ∈ [1, 4]) |
-| `mamba_v1_symbolic` | `verify_mamba_v1_symbolic.py` | `kernels/mamba_v1.py` | `SUCCESSFUL` (`--unwind 5`; state ∈ [1, 4], seq ∈ [2, 8]) |
-| `interpolate_bilinear_symbolic` | `verify_interpolate_bilinear_symbolic.py` | `kernels/interpolate_bilinear.py` | `SUCCESSFUL` (`--unwind 5`; H_src, W_src ∈ {10, 19, 28}) |
+| `tensor_add` | `tensor_add.py` | `kernels/tensor_add.py` | `SUCCESSFUL` |
+| `tensor_add_buggy` | `tensor_add_buggy.py` | `kernels/tensor_add_buggy.py` | `FAILED` |
+| `tensor_add_symbolic` | `tensor_add_symbolic.py` | `kernels/tensor_add.py` | `SUCCESSFUL` (`--unwind 6`) |
+| `transpose2d` | `transpose2d.py` | `kernels/transpose2d.py` | `SUCCESSFUL` |
+| `transpose2d_buggy` | `transpose2d_buggy.py` | `kernels/transpose2d_buggy.py` | `FAILED` |
+| `matmul` | `matmul.py` | `kernels/matmul.py` | `SUCCESSFUL` |
+| `matmul_big` | `matmul_big.py` | `kernels/matmul.py` | `SUCCESSFUL` |
+| `matmul_buggy` | `matmul_buggy.py` | `kernels/matmul_buggy.py` | `FAILED` |
+| `maxpooling` | `maxpooling.py` | `kernels/maxpooling.py` | `SUCCESSFUL` |
+| `maxpooling_buggy` | `maxpooling_buggy.py` | `kernels/maxpooling_buggy.py` | `FAILED` |
+| `interpolate_bilinear` | `interpolate_bilinear.py` | `kernels/interpolate_bilinear.py` | `SUCCESSFUL` |
+| `interpolate_bilinear_buggy` | `interpolate_bilinear_buggy.py` | `kernels/interpolate_bilinear_buggy.py` | `FAILED` |
+| `interpolate_trilinear` | `interpolate_trilinear.py` | `kernels/interpolate_trilinear.py` | `SUCCESSFUL` |
+| `interpolate_trilinear_buggy` | `interpolate_trilinear_buggy.py` | `kernels/interpolate_trilinear_buggy.py` | `FAILED` |
+| `matmul_basic` | `matmul_basic.py` | `kernels/matmul_basic.py` | `SUCCESSFUL` |
+| `matmul_basic_buggy` | `matmul_basic_buggy.py` | `kernels/matmul_basic_buggy.py` | `FAILED` |
+| `mamba_v1` | `mamba_v1.py` | `kernels/mamba_v1.py` | `SUCCESSFUL` |
+| `mamba_v1_buggy` | `mamba_v1_buggy.py` | `kernels/mamba_v1_buggy.py` | `FAILED` |
+| `transpose2d_symbolic` | `transpose2d_symbolic.py` | `kernels/transpose2d.py` | `SUCCESSFUL` (`--unwind 5`; F1, F2 ∈ [1, 4]) |
+| `maxpooling_symbolic` | `maxpooling_symbolic.py` | `kernels/maxpooling.py` | `SUCCESSFUL` (`--unwind 5`; H = k·128, k ∈ [1, 4]) |
+| `mamba_v1_symbolic` | `mamba_v1_symbolic.py` | `kernels/mamba_v1.py` | `SUCCESSFUL` (`--unwind 5`; state ∈ [1, 4], seq ∈ [2, 8]) |
+| `interpolate_bilinear_symbolic` | `interpolate_bilinear_symbolic.py` | `kernels/interpolate_bilinear.py` | `SUCCESSFUL` (`--unwind 5`; H_src, W_src ∈ {10, 19, 28}) |
 
 `verify.py` is the single source of truth for these pairings, the ESBMC
 flags, and the expected verdicts.
@@ -96,7 +92,8 @@ flags, and the expected verdicts.
 
 Requires ESBMC 8.2.0 or later with the Python frontend (transitive-import
 support landed in [esbmc/esbmc#4512](https://github.com/esbmc/esbmc/pull/4512);
-the bare-annotation fix in [esbmc/esbmc#4511](https://github.com/esbmc/esbmc/pull/4511)).
+the bare-annotation fix in [esbmc/esbmc#4511](https://github.com/esbmc/esbmc/pull/4511);
+the entry-vs-submodule name-collision fix in [esbmc/esbmc#4517](https://github.com/esbmc/esbmc/pull/4517)).
 
 ```bash
 make verify              # run ESBMC on every target, tally results

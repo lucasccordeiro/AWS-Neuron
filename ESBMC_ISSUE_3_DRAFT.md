@@ -1,8 +1,10 @@
-# ESBMC upstream issue (filed)
+# ESBMC upstream issue (filed and resolved)
 
 > Filed as https://github.com/esbmc/esbmc/issues/4513 (labels: `python`, `bug`).
-> Awaiting upstream triage. The `verify_<name>.py` prefix on every entry script
-> is the working repo's workaround.
+> Fixed by https://github.com/esbmc/esbmc/pull/4517 (merged). The
+> `verify_<name>.py` prefix workaround has been removed; entry scripts
+> now sit at `harness/<name>.py` and share their basename with
+> `harness/kernels/<name>.py` without colliding.
 
 ## Title
 

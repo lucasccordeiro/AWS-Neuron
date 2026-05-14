@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run the NKI/ESBMC proof-of-concept regression suite.
 
-Each target is an entry script under `harness/verify_<name>.py` that imports
+Each target is an entry script under `harness/<name>.py` that imports
 `stubs` and the appropriate `kernels.<module>`, sets up concrete (or
 nondet) input shapes, and asserts the kernel's output contract. ESBMC is
 invoked directly on each entry script.
@@ -50,28 +50,28 @@ class Target:
 
 
 MANIFEST: list[Target] = [
-    Target("tensor_add",                 "verify_tensor_add.py",                 (),                "SUCCESSFUL"),
-    Target("tensor_add_buggy",           "verify_tensor_add_buggy.py",           (),                "FAILED"),
-    Target("tensor_add_symbolic",        "verify_tensor_add_symbolic.py",        ("--unwind", "6"), "SUCCESSFUL"),
-    Target("transpose2d",                "verify_transpose2d.py",                (),                "SUCCESSFUL"),
-    Target("transpose2d_buggy",          "verify_transpose2d_buggy.py",          (),                "FAILED"),
-    Target("matmul",                     "verify_matmul.py",                     (),                "SUCCESSFUL"),
-    Target("matmul_big",                 "verify_matmul_big.py",                 (),                "SUCCESSFUL"),
-    Target("matmul_buggy",               "verify_matmul_buggy.py",               (),                "FAILED"),
-    Target("maxpooling",                 "verify_maxpooling.py",                 (),                "SUCCESSFUL"),
-    Target("maxpooling_buggy",           "verify_maxpooling_buggy.py",           (),                "FAILED"),
-    Target("interpolate_bilinear",       "verify_interpolate_bilinear.py",       (),                "SUCCESSFUL"),
-    Target("interpolate_bilinear_buggy", "verify_interpolate_bilinear_buggy.py", (),                "FAILED"),
-    Target("interpolate_trilinear",      "verify_interpolate_trilinear.py",      (),                "SUCCESSFUL"),
-    Target("interpolate_trilinear_buggy","verify_interpolate_trilinear_buggy.py",(),                "FAILED"),
-    Target("matmul_basic",               "verify_matmul_basic.py",               (),                "SUCCESSFUL"),
-    Target("matmul_basic_buggy",         "verify_matmul_basic_buggy.py",         (),                "FAILED"),
-    Target("mamba_v1",                   "verify_mamba_v1.py",                   (),                "SUCCESSFUL"),
-    Target("mamba_v1_buggy",             "verify_mamba_v1_buggy.py",             (),                "FAILED"),
-    Target("transpose2d_symbolic",       "verify_transpose2d_symbolic.py",       ("--unwind", "5"), "SUCCESSFUL"),
-    Target("maxpooling_symbolic",        "verify_maxpooling_symbolic.py",        ("--unwind", "5"), "SUCCESSFUL"),
-    Target("mamba_v1_symbolic",          "verify_mamba_v1_symbolic.py",          ("--unwind", "5"), "SUCCESSFUL"),
-    Target("interpolate_bilinear_symbolic", "verify_interpolate_bilinear_symbolic.py",
+    Target("tensor_add",                 "tensor_add.py",                 (),                "SUCCESSFUL"),
+    Target("tensor_add_buggy",           "tensor_add_buggy.py",           (),                "FAILED"),
+    Target("tensor_add_symbolic",        "tensor_add_symbolic.py",        ("--unwind", "6"), "SUCCESSFUL"),
+    Target("transpose2d",                "transpose2d.py",                (),                "SUCCESSFUL"),
+    Target("transpose2d_buggy",          "transpose2d_buggy.py",          (),                "FAILED"),
+    Target("matmul",                     "matmul.py",                     (),                "SUCCESSFUL"),
+    Target("matmul_big",                 "matmul_big.py",                 (),                "SUCCESSFUL"),
+    Target("matmul_buggy",               "matmul_buggy.py",               (),                "FAILED"),
+    Target("maxpooling",                 "maxpooling.py",                 (),                "SUCCESSFUL"),
+    Target("maxpooling_buggy",           "maxpooling_buggy.py",           (),                "FAILED"),
+    Target("interpolate_bilinear",       "interpolate_bilinear.py",       (),                "SUCCESSFUL"),
+    Target("interpolate_bilinear_buggy", "interpolate_bilinear_buggy.py", (),                "FAILED"),
+    Target("interpolate_trilinear",      "interpolate_trilinear.py",      (),                "SUCCESSFUL"),
+    Target("interpolate_trilinear_buggy","interpolate_trilinear_buggy.py",(),                "FAILED"),
+    Target("matmul_basic",               "matmul_basic.py",               (),                "SUCCESSFUL"),
+    Target("matmul_basic_buggy",         "matmul_basic_buggy.py",         (),                "FAILED"),
+    Target("mamba_v1",                   "mamba_v1.py",                   (),                "SUCCESSFUL"),
+    Target("mamba_v1_buggy",             "mamba_v1_buggy.py",             (),                "FAILED"),
+    Target("transpose2d_symbolic",       "transpose2d_symbolic.py",       ("--unwind", "5"), "SUCCESSFUL"),
+    Target("maxpooling_symbolic",        "maxpooling_symbolic.py",        ("--unwind", "5"), "SUCCESSFUL"),
+    Target("mamba_v1_symbolic",          "mamba_v1_symbolic.py",          ("--unwind", "5"), "SUCCESSFUL"),
+    Target("interpolate_bilinear_symbolic", "interpolate_bilinear_symbolic.py",
                                                                                  ("--unwind", "5"), "SUCCESSFUL"),
 ]
 

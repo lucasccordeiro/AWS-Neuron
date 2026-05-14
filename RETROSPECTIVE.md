@@ -24,7 +24,7 @@ The library `harness/stubs.py` is a shape-and-bounds model of the
 Neuron Kernel Interface (NKI). Every NKI primitive used by the corpus is
 expressed as a Python function/class that tracks tile *shape and dtype
 metadata only* — no actual computation — and asserts preconditions with
-plain `assert`. The eighteen entry scripts under `harness/verify_*.py`
+plain `assert`. The entry scripts under `harness/*.py`
 exercise nine NKI kernels (two tutorial, four `contributed/`, one ML
 model — Mamba SSM) plus their positive-control buggy variants.
 
@@ -80,7 +80,7 @@ Catalogued at a glance to show breadth:
 |---|---|---|---|
 | [#4509](https://github.com/esbmc/esbmc/issues/4509) | **RESOLVED** ([PR #4512](https://github.com/esbmc/esbmc/pull/4512)) | transitive imports through intermediate module | retired the build-time concatenation step |
 | [#4510](https://github.com/esbmc/esbmc/issues/4510) | **RESOLVED** ([PR #4511](https://github.com/esbmc/esbmc/pull/4511)) | bare `var: int` annotation inside `while` body → silent SIGABRT (nlohmann JSON `type_error`) | retired the `= 0` initialisers in `interpolate_*` |
-| [#4513](https://github.com/esbmc/esbmc/issues/4513) | OPEN | entry script and imported submodule share unqualified name → silent segfault | `verify_` prefix on every entry script |
+| [#4513](https://github.com/esbmc/esbmc/issues/4513) | **RESOLVED** ([PR #4517](https://github.com/esbmc/esbmc/pull/4517)) | entry script and imported submodule share unqualified name → silent segfault | retired the `verify_` prefix on entry scripts |
 | [#4514](https://github.com/esbmc/esbmc/issues/4514) | OPEN | user-defined `__getitem__` → internal assertion in `value_set.cpp` | `a[i:j, k:l]` → `slice2d(a, i, j, k, l)` |
 | [#4515](https://github.com/esbmc/esbmc/issues/4515) | OPEN | tuple unpack fails when source is class attribute or `tuple`-typed parameter | `M, N = a.shape` → individual scalar assignments |
 | [#4516](https://github.com/esbmc/esbmc/issues/4516) | OPEN | `for`-loop over an alias of `range` or a function returning `range` fails | `for x in nl.affine_range(n)` → `while x < n: ...; x += 1` |
@@ -156,9 +156,11 @@ drifted between families (AUDIT.md Findings 1–7).
    gates the bound check). Generalises beyond NKI: any DSL with
    broadcast-style fancy indexing should be amenable.
 
-4. **`verify_` prefix on entry scripts.** A small convention that
-   sidesteps issue #4513 (entry-vs-submodule name collision segfault).
-   Worth a line in any future PoC README. Will retire once #4513 lands.
+4. **`verify_` prefix on entry scripts** (retired). Was the working
+   convention while issue #4513 (entry-vs-submodule name-collision
+   segfault) was open. Resolved by [PR #4517](https://github.com/esbmc/esbmc/pull/4517);
+   entry scripts now share their basename with the matching kernel
+   module without collision.
 
 5. **Positive-control buggy variants.** Every kernel pair (`*` good,
    `*_buggy`) gives both a "verify produces SUCCESSFUL" and a "verify
@@ -213,7 +215,7 @@ If you've never seen the PoC:
 2. `harness/stubs.py` — the trusted base, ~380 LoC.
 3. `harness/kernels/tensor_add.py` — smallest port, shows the rewrite
    convention end-to-end.
-4. `harness/verify_tensor_add.py` — what ESBMC actually runs.
+4. `harness/tensor_add.py` — what ESBMC actually runs.
 5. `AUDIT.md` — the canonical-stubs audit and the two
    stub-correctness incidents.
 6. `verify.py` — the manifest and the regression runner.
