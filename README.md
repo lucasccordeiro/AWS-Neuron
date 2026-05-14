@@ -88,6 +88,7 @@ depending on the size of the shape family they sweep. The full suite
   retired, source-rewriting history, verification patterns.
 - **`AUDIT.md`** — stub-correctness audit (the original duplicated-stubs
   diff plus the per-port contract-tightness incidents).
+- **`ROADMAP.md`** — what's left to port, grouped by stub-library effort.
 
 ## Provenance
 
