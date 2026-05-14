@@ -6,9 +6,10 @@ assumes familiarity with the verifier but not with NKI.
 
 ## TL;DR
 
-- **9 NKI kernel families ported**, 18 build targets, 100 % pass rate
-  against expected verdicts; full regression in under 30 s wall-clock on
-  Bitwuzla.
+- **9 NKI kernel families ported**, 22 build targets (concrete +
+  positive-control + 5 symbolic-shape variants), 100 % pass rate
+  against expected verdicts; full regression in about 3 minutes
+  wall-clock on Bitwuzla.
 - **6 ESBMC Python-frontend issues filed upstream**, 2 already
   fixed-and-merged (#4509, #4510). 4 still open (#4513–#4516).
 - **2 stub-correctness incidents (AUDIT.md Findings 8 and 9)** caught by
@@ -30,7 +31,9 @@ model — Mamba SSM) plus their positive-control buggy variants.
 
 ESBMC runs the entry scripts directly via the Python frontend, no special
 flags beyond `--unwind 6` for the one symbolic-shape harness. Each target
-takes 1–3 s; total 18 in well under 30 s.
+takes 1–3 s; the five symbolic-shape targets each run for ~5–60 s
+depending on the shape family they sweep; the full 22-target suite
+finishes in about 3 minutes end-to-end.
 
 The stub library is around 380 LoC. The kernels are mechanical ports of
 the upstream NKI source through three documented source rewrites (see

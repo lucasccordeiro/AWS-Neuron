@@ -100,8 +100,12 @@ make verify              # run ESBMC on every target, tally results
 python3 verify.py NAME   # run a single target
 ```
 
-Each target completes in 1–3 seconds wall-clock on a stock laptop; the full
-suite (18 targets) finishes in well under 30 seconds.
+Concrete-shape targets complete in 1–3 seconds wall-clock each on a
+stock laptop. The five symbolic-shape targets (`tensor_add_symbolic`,
+`transpose2d_symbolic`, `maxpooling_symbolic`, `mamba_v1_symbolic`,
+`interpolate_bilinear_symbolic`) run for ~5–60 seconds depending on
+the size of the shape family they sweep. The full suite (22 targets)
+finishes in about 3 minutes wall-clock end-to-end.
 
 ## Stub-library scope
 
