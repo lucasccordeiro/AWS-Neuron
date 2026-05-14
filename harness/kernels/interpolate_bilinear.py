@@ -11,12 +11,7 @@ from stubs import *
 nl_affine_range = range  # local rebind: cross-module-propagated alias loses iteration-count info (esbmc/esbmc#4533)
 
 def interpolate_bilinear_2x_fwd(src_arr: Tile3D, chunk_size: int) -> Tile3D:
-    # NOTE: per-axis assignment instead of `nc, h_src, w_src = src_arr.shape`
-    # because esbmc/esbmc#4532 (destructured tuple-attr variable used in
-    # arithmetic if-condition inside a for-loop body) is still open.
-    nc: int    = src_arr.d0
-    h_src: int = src_arr.d1
-    w_src: int = src_arr.d2
+    nc, h_src, w_src = src_arr.shape
     h_dst: int = h_src * 2
     w_dst: int = w_src * 2
 

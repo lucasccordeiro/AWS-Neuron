@@ -180,15 +180,14 @@ local transformations:
   in place because [esbmc/esbmc#4523](https://github.com/esbmc/esbmc/issues/4523)
   — slice expressions in subscripts and the `slice()` builtin not modelled
   — is the next layer of the same code path and is still open)
-- shape destructuring `M, N = a.shape` — kept verbatim across most kernels
+- shape destructuring `M, N = a.shape` — kept verbatim across all kernels
   after [PR #4524](https://github.com/esbmc/esbmc/pull/4524) closed
-  esbmc/esbmc#4515 (tuple unpack from a `tuple`-typed attribute). The
-  two interpolate kernels keep the per-axis form
-  (`M = a.d0; N = a.d1; …`) because
-  [esbmc/esbmc#4532](https://github.com/esbmc/esbmc/issues/4532) — a
-  destructured variable referenced from an arithmetic if-condition
-  inside a for-loop body — is still open. Stub library now exposes
-  `Tile.shape`, `Tile3D.shape`, `Tile4D.shape` as tuple attributes.
+  esbmc/esbmc#4515 (tuple unpack from a `tuple`-typed attribute) and
+  [PR #4534](https://github.com/esbmc/esbmc/pull/4534) closed
+  esbmc/esbmc#4532 (destructured tuple-attr variable used in
+  arithmetic if-condition inside a for-loop body). Stub library
+  exposes `Tile.shape`, `Tile3D.shape`, `Tile4D.shape` as tuple
+  attributes.
 
 These rewrites preserve control flow and index arithmetic verbatim and are
 the natural target for an `ast`-based pre-pass in a scaled-up version. If

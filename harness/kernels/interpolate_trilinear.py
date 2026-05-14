@@ -12,13 +12,7 @@ from stubs import *
 nl_affine_range = range  # local rebind: cross-module-propagated alias loses iteration-count info (esbmc/esbmc#4533)
 
 def interpolate_trilinear_2x_fwd(src_arr: Tile4D, chunk_size: int) -> Tile4D:
-    # NOTE: per-axis assignment instead of `nc, d_src, h_src, w_src = src_arr.shape`
-    # because esbmc/esbmc#4532 (destructured tuple-attr variable used in
-    # arithmetic if-condition inside a for-loop body) is still open.
-    nc: int    = src_arr.d0
-    d_src: int = src_arr.d1
-    h_src: int = src_arr.d2
-    w_src: int = src_arr.d3
+    nc, d_src, h_src, w_src = src_arr.shape
     d_dst: int = d_src * 2
     h_dst: int = h_src * 2
     w_dst: int = w_src * 2
