@@ -59,8 +59,8 @@ silent on transpositions that happen to preserve total volume.
 |---|---|---|
 | `tutorials/attention_fwd_performance` (v1) | `nl.matmul` (high-level), softmax chain (`nl_reduce_2d_axis1_keepdims`, `nl_elementwise_unary_2d`), `nl_transpose_2d`, `nisa_tensor_scalar_broadcast`, full-tile `nl_load_2d_full` / `nl_store_2d_full` | ✅ |
 | `tutorials/attention_fwd_performance` (v2) + `attention_kernel_utils::softmax_isa` | ISA-level: `nisa_nc_matmul` (existing), `nisa_nc_transpose`, `nisa_tensor_reduce_2d_axis1`, `nisa_reciprocal_2d`, `nisa_activation_no_scale`; reusable `softmax_isa` helper | ✅ |
-| `tutorials/attention_fwd_performance` (v3) | same ISA primitives, asymmetric blocked layout (`seqlen_q >= 512`, 4-D `qk` tile, `nl.ds` dynamic-slice indexer) | pending (~2 h) |
-| `contributed/pipelined_attention.py` | same family + producer/consumer pipelining | pending (~2 h after v3) |
+| `tutorials/attention_fwd_performance` (v3) | same ISA primitives, asymmetric blocked layout (`seqlen_q >= 512`, 4-D `qk` tile, `nl.ds` dynamic-slice indexer modelled as explicit ranges); adds `slice_4d_drop_d0_d1`, `nl_load_3d_slot` / `nl_store_3d_slot`, `nl_load_3d_at`; closes AUDIT-13 operand-swap blind spot | ✅ |
+| `contributed/pipelined_attention.py` | producer/consumer pipelining over Flash-Attention. **Deferred — out of current modelling scope.** Uses: custom `sb_mod(base_addr=, num_free_tiles=)` and `psum.alloc(<callback>)` allocators; `par_dim(n)` shape-tuple wrappers; nested function definitions (`def load_q(grp_i):` inside the kernel body); 2-D `nl.mgrid[0:p, 0:n]` with multi-return destructure; 3-D fancy load `k[batch_id, ip_k, section_len*section_i + 512*i + if_k]`; `nl.program_id(0)`, `nl.shared_constant`, `@nki.baremetal`; 16K seqlen with nested loop counts (128, 64, 16, 4). Each is independently a modelling decision; the bundle is multi-day, not multi-hour. Worth its own work unit. |
 
 Attention is a flagship demo target. Most of the new stubs are
 passthrough on shape (softmax operates on shape, not value), so
@@ -113,4 +113,5 @@ Skip unless dtype modelling becomes a goal.
 | Tier 1 + Tier 2 | 37 | **DONE** (incl. PR #74 historical-bug repro) |
 | Tier 1 + Tier 2 + Tier 3 pilot | 39 | **DONE** |
 | + attn_fwd_v2 | 41 | **DONE** |
-| All of Tier 3 (incl. v3 + pipelined_attention) | ~45 | pending |
+| + attn_fwd_v3 | 43 | **DONE** |
+| pipelined_attention.py (Flash Attention) | ~45 | deferred (see note above) |
