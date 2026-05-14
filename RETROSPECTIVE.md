@@ -81,7 +81,8 @@ Catalogued at a glance to show breadth:
 | [#4509](https://github.com/esbmc/esbmc/issues/4509) | **RESOLVED** ([PR #4512](https://github.com/esbmc/esbmc/pull/4512)) | transitive imports through intermediate module | retired the build-time concatenation step |
 | [#4510](https://github.com/esbmc/esbmc/issues/4510) | **RESOLVED** ([PR #4511](https://github.com/esbmc/esbmc/pull/4511)) | bare `var: int` annotation inside `while` body → silent SIGABRT (nlohmann JSON `type_error`) | retired the `= 0` initialisers in `interpolate_*` |
 | [#4513](https://github.com/esbmc/esbmc/issues/4513) | **RESOLVED** ([PR #4517](https://github.com/esbmc/esbmc/pull/4517)) | entry script and imported submodule share unqualified name → silent segfault | retired the `verify_` prefix on entry scripts |
-| [#4514](https://github.com/esbmc/esbmc/issues/4514) | OPEN | user-defined `__getitem__` → internal assertion in `value_set.cpp` | `a[i:j, k:l]` → `slice2d(a, i, j, k, l)` |
+| [#4514](https://github.com/esbmc/esbmc/issues/4514) | **RESOLVED** ([PR #4522](https://github.com/esbmc/esbmc/pull/4522)) | user-defined `__getitem__` → internal assertion in `value_set.cpp` | follow-on [#4523](https://github.com/esbmc/esbmc/issues/4523) still gates retiring `slice2d` |
+| [#4523](https://github.com/esbmc/esbmc/issues/4523) | OPEN | `a[i:j]` colon slices and `slice()` builtin not modelled | keeps the `a[i:j, k:l]` → `slice2d(a, i, j, k, l)` rewrite in place |
 | [#4515](https://github.com/esbmc/esbmc/issues/4515) | OPEN | tuple unpack fails when source is class attribute or `tuple`-typed parameter | `M, N = a.shape` → individual scalar assignments |
 | [#4516](https://github.com/esbmc/esbmc/issues/4516) | OPEN | `for`-loop over an alias of `range` or a function returning `range` fails | `for x in nl.affine_range(n)` → `while x < n: ...; x += 1` |
 

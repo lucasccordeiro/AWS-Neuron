@@ -162,8 +162,12 @@ local transformations:
   ([esbmc/esbmc#4516](https://github.com/esbmc/esbmc/issues/4516):
   iterating an alias or wrapper of `range` does not parse)
 - `a[i:j, k:l]` → `slice2d(a, i, j, k, l)`
-  ([esbmc/esbmc#4514](https://github.com/esbmc/esbmc/issues/4514):
-  user-defined `__getitem__` triggers an internal assertion failure)
+  (originally [esbmc/esbmc#4514](https://github.com/esbmc/esbmc/issues/4514),
+  the `__getitem__` assertion crash — resolved by
+  [PR #4522](https://github.com/esbmc/esbmc/pull/4522); the rewrite stays
+  in place because [esbmc/esbmc#4523](https://github.com/esbmc/esbmc/issues/4523)
+  — slice expressions in subscripts and the `slice()` builtin not modelled
+  — is the next layer of the same code path and is still open)
 - shape destructuring `M, N = a.shape` → `M = a.d0; N = a.d1`
   ([esbmc/esbmc#4515](https://github.com/esbmc/esbmc/issues/4515):
   tuple unpacking fails when the source is a class attribute or
