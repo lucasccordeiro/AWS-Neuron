@@ -7,7 +7,6 @@
 # Tile3D with the outer two indices flattened into one slab axis.
 
 from stubs import *
-nl_affine_range = range  # local rebind: cross-module-propagated alias loses iteration-count info (esbmc/esbmc#4533)
 
 def nki_matmul_block_free(lhsT: Tile, rhs: Tile) -> Tile:
     K, M  = lhsT.shape

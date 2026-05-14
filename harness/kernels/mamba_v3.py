@@ -8,7 +8,6 @@
 # value.
 
 from stubs import *
-nl_affine_range = range  # local rebind: cross-module-propagated alias loses iteration-count info (esbmc/esbmc#4533)
 
 def mamba_v3(delta: Tile3D, u: Tile3D, A: Tile, B: Tile3D, C: Tile3D,
              seq_len_fsize: int) -> Tile3D:

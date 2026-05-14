@@ -90,7 +90,7 @@ Catalogued at a glance to show breadth:
 | [#4532](https://github.com/esbmc/esbmc/issues/4532) | **RESOLVED** ([PR #4534](https://github.com/esbmc/esbmc/pull/4534)) | destructured tuple-attr variable not visible in arithmetic if-condition inside for-loop body | retired; interpolate kernels now use `M, N = a.shape` form |
 | [#4516](https://github.com/esbmc/esbmc/issues/4516) | **RESOLVED** ([PR #4521](https://github.com/esbmc/esbmc/pull/4521)) | `for`-loop over an alias of `range` or a function returning `range` fails | retired the `while`-loop rewrite; native `for` loops back in kernels |
 | [#4525](https://github.com/esbmc/esbmc/issues/4525) | **RESOLVED** ([PR #4529](https://github.com/esbmc/esbmc/pull/4529)) | range-alias / wrapper rewriter doesn't propagate across module imports | name resolution lands; iteration-count loss is the follow-on |
-| [#4533](https://github.com/esbmc/esbmc/issues/4533) | OPEN | cross-module range alias resolves but loses iteration-count info (unbounded unwinding) | keeps the per-kernel `nl_affine_range = range` rebind |
+| [#4533](https://github.com/esbmc/esbmc/issues/4533) | **RESOLVED** ([PR #4535](https://github.com/esbmc/esbmc/pull/4535)) | cross-module range alias resolves but loses iteration-count info | retired the per-kernel `nl_affine_range = range` rebind in all 26 kernel files |
 
 The remaining open issues all have minimal repros in their bodies and
 would, collectively, retire every remaining concession the PoC makes
@@ -110,7 +110,7 @@ the ESBMC team to see what their fixes unblocked end-to-end.
 | Rewrite | Earlier form | Retired by | Current form |
 |---|---|---|---|
 | `for x in nl.affine_range(n):` | `x: int = 0; while x < n: ...; x = x + 1` | [PR #4521](https://github.com/esbmc/esbmc/pull/4521) (closing #4516) + [PR #4534](https://github.com/esbmc/esbmc/pull/4534) (transitive) | native `for x in nl_affine_range(n):` |
-| `nl_affine_range = range` rebind | per-kernel local rebind required | (residual) | still required while [#4533](https://github.com/esbmc/esbmc/issues/4533) is open — cross-module-propagated alias loses iteration-count info |
+| `nl_affine_range = range` rebind | per-kernel local rebind required | [PR #4535](https://github.com/esbmc/esbmc/pull/4535) (closing #4533) | retired in all kernels; the alias is read transparently from `stubs.py` |
 | `M, N = a.shape` | `M: int = a.d0; N: int = a.d1` (per axis) | [PR #4524](https://github.com/esbmc/esbmc/pull/4524) (closing #4515) + [PR #4534](https://github.com/esbmc/esbmc/pull/4534) (closing #4532, the destructure-in-arithmetic-if-cond follow-on) | native tuple destructure |
 | Bare `var: int` declarations inside `while` | `var: int = 0` initialiser shim | [PR #4511](https://github.com/esbmc/esbmc/pull/4511) (closing #4510) | declarations without initializer where natural |
 | Same-name entry script + imported kernel | `verify_<name>.py` prefix to disambiguate | [PR #4517](https://github.com/esbmc/esbmc/pull/4517) (closing #4513) | entry scripts share the kernel's basename |
@@ -121,9 +121,9 @@ the ESBMC team to see what their fixes unblocked end-to-end.
 So a kernel landed in the repo a few iterations ago looks substantially
 different from the same kernel now: the same control flow, the same
 index arithmetic, but the Python-level surface has converged on the
-upstream NKI form. Two source rewrites remain active (`slice2d`, plus
-the `nl_affine_range = range` rebind as scaffolding); both retire when
-their issues close.
+upstream NKI form. One source rewrite remains active (`slice2d`), and
+it retires when [esbmc/esbmc#4523](https://github.com/esbmc/esbmc/issues/4523)
+closes.
 
 ## Stub-correctness incidents (AUDIT.md)
 

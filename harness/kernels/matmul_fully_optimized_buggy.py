@@ -5,7 +5,6 @@
 # of k_idx+1 on the K-end). The upstream file is correct as published.
 
 from stubs import *
-nl_affine_range = range  # local rebind: cross-module-propagated alias loses iteration-count info (esbmc/esbmc#4533)
 
 def nki_matmul_fully_optimized(lhsT: Tile, rhs: Tile,
                                TILES_IN_BLOCK_M: int,

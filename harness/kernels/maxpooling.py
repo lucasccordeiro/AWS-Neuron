@@ -8,7 +8,6 @@
 # nl_max_fancy_3d_to_2d (see stubs.py).
 
 from stubs import *
-nl_affine_range = range  # local rebind: cross-module-propagated alias loses iteration-count info (esbmc/esbmc#4533)
 
 def max_pooling_2d_stride_1(in_tensor: Tile, k: int) -> Tile:
     h_in, w_in = in_tensor.shape

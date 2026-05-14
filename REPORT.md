@@ -186,15 +186,12 @@ three local conventions:
    [esbmc/esbmc#4523](https://github.com/esbmc/esbmc/issues/4523)
    (slice expressions on user `__getitem__`) is open.
 
-Each kernel that iterates also carries a one-line
-`nl_affine_range = range` rebind directly under `from stubs import *`
-to give the loop a same-file alias with iteration-count metadata
-([esbmc/esbmc#4533](https://github.com/esbmc/esbmc/issues/4533)).
-
 For-loops are native (`for m in nl_affine_range(N):`); tuple
-destructuring is native (`M, N = a.shape`); index arithmetic and
-control flow are byte-for-byte against the upstream sources. The
-history of which rewrites existed earlier and how each retired is in
+destructuring is native (`M, N = a.shape`); the `nl_affine_range`
+alias is read transparently from `stubs.py` with full
+iteration-count metadata; index arithmetic and control flow are
+byte-for-byte against the upstream sources. The history of which
+rewrites existed earlier and how each retired is in
 `RETROSPECTIVE.md`.
 
 ## Kernel coverage

@@ -5,7 +5,6 @@
 # tutorials. Mechanical port with no kernel-logic changes.
 
 from stubs import *
-nl_affine_range = range  # local rebind: cross-module-propagated alias loses iteration-count info (esbmc/esbmc#4533)
 
 def matmul_kernel(A_DRAM: Tile, B_DRAM: Tile,
                   TILES_IN_BLOCK_K: int,

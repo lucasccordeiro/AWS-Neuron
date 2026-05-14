@@ -6,7 +6,6 @@
 # `nisa.nc_matmul` with accumulation into a PSUM destination.
 
 from stubs import *
-nl_affine_range = range  # local rebind: cross-module-propagated alias loses iteration-count info (esbmc/esbmc#4533)
 
 def nki_matmul_tiled(lhsT: Tile, rhs: Tile) -> Tile:
     K, M  = lhsT.shape

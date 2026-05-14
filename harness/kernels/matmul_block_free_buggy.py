@@ -5,7 +5,6 @@
 # of m_idx+1 for the M-end). The upstream file is correct as published.
 
 from stubs import *
-nl_affine_range = range  # local rebind: cross-module-propagated alias loses iteration-count info (esbmc/esbmc#4533)
 
 def nki_matmul_block_free(lhsT: Tile, rhs: Tile) -> Tile:
     K, M  = lhsT.shape
