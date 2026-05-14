@@ -90,10 +90,9 @@ flags, and the expected verdicts.
 
 ## How to run
 
-Requires ESBMC 8.2.0 or later with the Python frontend (transitive-import
-support landed in [esbmc/esbmc#4512](https://github.com/esbmc/esbmc/pull/4512);
-the bare-annotation fix in [esbmc/esbmc#4511](https://github.com/esbmc/esbmc/pull/4511);
-the entry-vs-submodule name-collision fix in [esbmc/esbmc#4517](https://github.com/esbmc/esbmc/pull/4517)).
+Requires ESBMC 8.3.0 or later with the Python frontend. The full list
+of upstream issues this PoC depends on (and the PRs that closed each
+one) lives in `RETROSPECTIVE.md`.
 
 ```bash
 make verify              # run ESBMC on every target, tally results
