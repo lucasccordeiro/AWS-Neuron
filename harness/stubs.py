@@ -274,10 +274,11 @@ def nisa_tensor_copy(dst: Tile, src: Tile) -> None:
 
 # ni.nc_matmul(a, b): a is (par_dim, M_stationary), b is (par_dim, N_moving);
 # returns (M, N). Hardware constraints: par_dim <= PMAX,
-# M <= GEMM_STATIONARY_FMAX, N <= GEMM_MOVING_FMAX.
+# M <= GEMM_STATIONARY_FMAX, N <= GEMM_MOVING_FMAX. Dtype shape-only per
+# AUDIT Finding 12 — attn_fwd_v2's second nc_matmul mixes scores_t (fp32)
+# with v_t (fp16-family).
 def ni_nc_matmul(a: Tile, b: Tile) -> Tile:
     assert a.d0 == b.d0
-    assert a.dtype == b.dtype
     assert a.d0 <= PMAX
     assert a.d1 <= GEMM_STATIONARY_FMAX
     assert b.d1 <= GEMM_MOVING_FMAX
@@ -285,10 +286,9 @@ def ni_nc_matmul(a: Tile, b: Tile) -> Tile:
 
 # nisa.nc_matmul(dst, a, b): explicit-destination form (matrix_multiplication
 # tutorial). dst must live in PSUM with the matmul output shape; same
-# hardware shape limits as ni_nc_matmul.
+# hardware shape limits and shape-only dtype as ni_nc_matmul.
 def nisa_nc_matmul(dst: Tile, a: Tile, b: Tile) -> None:
     assert a.d0 == b.d0
-    assert a.dtype == b.dtype
     assert a.d0 <= PMAX
     assert a.d1 <= GEMM_STATIONARY_FMAX
     assert b.d1 <= GEMM_MOVING_FMAX
@@ -671,14 +671,11 @@ def nl_store_2d_full(dst: Tile, value: Tile) -> None:
 #   y is (K, N) if transpose_y=False else (N, K); contraction = y.d1 if
 #   transpose_y else y.d0.
 # Returns the (M, N) PSUM tile. Same hardware shape limits as ni_nc_matmul.
-# Dtype need not match across operands — the high-level nl.matmul accepts
-# mixed-precision inputs (e.g. fp32 stationary + fp16 moving, as in
-# attn_fwd_v1's second matmul `nl.matmul(scores_t_fp32, v_sbuf_t_fp16, ...)`);
-# the engine casts. (Audit Finding 12.)
-# TODO: tier the dtype contract once a port surfaces a non-fp16 moving
-# operand. Current evidence supports {fp32, fp16} stationary × fp16-family
-# moving; tightening prematurely would re-reject the very pattern that
-# motivated the relaxation.
+# Dtype need not match across operands — both the high-level nl.matmul and
+# the lower-level nisa.nc_matmul accept mixed-precision inputs (e.g. fp32
+# stationary + fp16 moving, as in attn_fwd_v1's and attn_fwd_v2's second
+# matmuls); the engine casts. (Audit Finding 12; ISA cousins
+# `ni_nc_matmul` / `nisa_nc_matmul` are relaxed in the same way.)
 def nl_matmul(x: Tile, y: Tile, transpose_x: bool, transpose_y: bool) -> Tile:
     if transpose_x:
         m: int = x.d1
@@ -725,6 +722,39 @@ def nisa_tensor_scalar_broadcast(dst: Tile, data: Tile, operand: Tile) -> None:
     assert dst.d1 == data.d1
     assert operand.d0 == data.d0
     assert operand.d1 == 1
+
+# nisa.tensor_reduce(dst, data, op, axis=(1,)) — explicit-destination reduction
+# along the free dim. dst is the column-vector tile (data.d0, 1). Shape-only
+# (the op distinguishes max vs sum vs ... but the shape contract is identical).
+def nisa_tensor_reduce_2d_axis1(dst: Tile, data: Tile) -> None:
+    assert dst.d0 == data.d0
+    assert dst.d1 == 1
+
+# nisa.reciprocal(dst, data) — elementwise reciprocal in explicit-dst form.
+# Shape-only on dtype (the engine handles cross-dtype casts).
+def nisa_reciprocal_2d(dst: Tile, data: Tile) -> None:
+    assert dst.d0 == data.d0
+    assert dst.d1 == data.d1
+
+# nisa.activation(dst, op, data) — elementwise unary activation in
+# explicit-dst form, without the optional scale operand. The full
+# `nisa_activation(dst, data, scale)` stub covers the scale-broadcast variant
+# used in the mamba kernels. Dtype equality matches the scale-bearing form:
+# the no-scale path is the same hardware instruction with one fewer operand,
+# so there's no reason its dtype contract should be looser.
+def nisa_activation_no_scale(dst: Tile, data: Tile) -> None:
+    assert dst.d0 == data.d0
+    assert dst.d1 == data.d1
+    assert dst.dtype == data.dtype
+
+# nisa.nc_transpose(dst, data) — explicit-destination 2-D transpose. The
+# destination must live in PSUM and have transposed shape (data.d1, data.d0).
+# `data.d0` is the partition axis of the input and must fit in PMAX.
+def nisa_nc_transpose(dst: Tile, data: Tile) -> None:
+    assert data.d0 <= PMAX
+    assert dst.d0 == data.d1
+    assert dst.d1 == data.d0
+    assert dst.buffer == BUF_PSUM
 
 # ============================================================== 5-D views (.ap)
 

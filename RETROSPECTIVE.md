@@ -6,8 +6,8 @@ assumes familiarity with the verifier but not with NKI.
 
 ## TL;DR
 
-- **16 NKI kernel functions ported** (across 10 upstream source files —
-  6 tutorials, 4 community-`contributed/` kernels), 39 build targets
+- **17 NKI kernel functions ported** (across 10 upstream source files —
+  6 tutorials, 4 community-`contributed/` kernels), 41 build targets
   (concrete + positive-control + 5 symbolic-shape variants + 1
   historical-bug reproduction), 100 % pass rate against expected
   verdicts; full regression in about 4 minutes wall-clock on Bitwuzla.
@@ -20,6 +20,9 @@ assumes familiarity with the verifier but not with NKI.
 - **4 stub-correctness incidents (AUDIT.md Findings 8, 9, 10, 12)** caught by
   the verifier on the first run of a freshly ported kernel — all would
   have shipped silently in the original per-file duplicated-stubs layout.
+  Finding 12's "sweep follow-up" (the matmul dtype contract applies to
+  both `nl_matmul` and the ISA cousins) was caught by attn_fwd_v2 on
+  first run, validating the established workflow.
 - **One novel verification pattern** (nondet representative elements for
   fancy-index bound checks) which generalised across maxpooling, both
   interpolate variants, and is reusable for any mgrid-style code.
@@ -55,6 +58,7 @@ filed ESBMC issue (#4514–#4516).
 | `tutorials/fused_mamba/mamba_nki_kernels.py` (v1 / v2 / v3) | tutorials | good + buggy each; v1 also symbolic-shape |
 | `tutorials/average_pool2d/average_pool2d_nki_kernels.py` | tutorials | good + buggy (introduces `Tile5D`, `tile3d_ap_5d`) |
 | `tutorials/attention_fwd_performance/attention_kernels.py::attn_fwd_v1` | tutorials | good + buggy (introduces `nl_matmul` with transpose flags, `nl_transpose_2d`, softmax-chain reductions, `nisa_tensor_scalar_broadcast`; surfaced AUDIT Finding 12 on `nl_matmul` dtype contract) |
+| `tutorials/attention_fwd_performance/attention_kernels.py::attn_fwd_v2` + `attention_kernel_utils.py::softmax_isa` | tutorials | good + buggy (ISA-level attention: `nisa_nc_matmul`, `nisa_nc_transpose`, `nisa_tensor_reduce_2d_axis1`, `nisa_reciprocal_2d`, `nisa_activation_no_scale`; reusable `softmax_isa` helper for v3 / pipelined_attention; surfaced AUDIT Finding 12 sweep across `ni_nc_matmul` / `nisa_nc_matmul` and Finding 13 on stationary/moving operand-swap blind spot) |
 | `contributed/matmul.py` | community | good (two sizes) + buggy |
 | `contributed/maxpooling.py` | community | good + buggy + symbolic-shape |
 | `contributed/interpolate_bilinear_fwd.py` | community | good + buggy + symbolic-shape |
@@ -83,6 +87,11 @@ Catalogued at a glance to show breadth:
   (covers `nl.max` and `nl.sum`), `nl_elementwise_unary_2d` (covers
   `nl.exp` and `nl.reciprocal`), `nisa_tensor_scalar_broadcast`,
   `nl_load_2d_full` / `nl_store_2d_full`
+- **ISA attention primitives** (v2 onward): `nisa_nc_transpose`,
+  `nisa_tensor_reduce_2d_axis1`, `nisa_reciprocal_2d`,
+  `nisa_activation_no_scale`; reusable `softmax_isa` helper composes
+  these into the standard subtract-max / exp / sum / reciprocal /
+  multiply softmax pipeline
 - **Matmul**: `ni_nc_matmul` (returning form), `nisa_nc_matmul`
   (explicit-destination form) — with par-dim ≤ PMAX and GEMM-FMAX limits
 - **Accumulation / reduction**: `iadd` (PSUM), `nl_loop_reduce`,

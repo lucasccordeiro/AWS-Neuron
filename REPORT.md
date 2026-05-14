@@ -132,7 +132,7 @@ specification artefacts or a co-design exercise with the NKI team.
 
 ## Stub-library scope
 
-`harness/stubs.py` (~720 LoC) provides shape-and-dtype models for:
+`harness/stubs.py` (~820 LoC) provides shape-and-dtype models for:
 
 ```
 Tile, Tile3D, Tile4D, Tile5D        # 2/3/4/5-D tiles (d0..d4, dtype, buffer)
@@ -153,6 +153,10 @@ nl_matmul                           # high-level nl.matmul with transpose flags
 nl_transpose_2d                     # nl.transpose returning PSUM
 nl_reduce_2d_axis1_keepdims         # nl.max / nl.sum axis=1 with keepdims
 nl_elementwise_unary_2d             # nl.exp / nl.reciprocal / etc.
+nisa_nc_transpose                   # nisa.nc_transpose explicit-dst
+nisa_tensor_reduce_2d_axis1         # nisa.tensor_reduce(axis=(1,)) explicit-dst
+nisa_reciprocal_2d                  # nisa.reciprocal(dst, data)
+nisa_activation_no_scale            # nisa.activation without scale operand
 ni_nc_matmul, nisa_nc_matmul        # nc_matmul (returning + explicit-destination)
 nisa_activation                     # elementwise unary (e.g. nl.exp) with scale
 nisa_tensor_tensor_scan             # associative scan (shape-passthrough)
@@ -265,13 +269,19 @@ Tutorials covered:
   the `.ap()` access-pattern view (`Tile5D`, `tile3d_ap_5d`) plus
   `nl.sum(view, axis=[3, 4])`, `nisa.tensor_scalar`, and 3-D
   `nisa.dma_copy`.
-- `tutorials/attention_fwd_performance` — `attn_fwd_v1`, the toy
-  128×128 nki.lang variant introducing high-level `nl.matmul` with
-  transpose flags, `nl.transpose`, the softmax chain
-  (`nl_reduce_2d_axis1_keepdims`, `nl_elementwise_unary_2d`), and
-  `nisa_tensor_scalar_broadcast` for column-vector broadcast
-  operands. Surfaced AUDIT Finding 12 (high-level `nl.matmul` accepts
-  mixed-precision inputs; the engine casts).
+- `tutorials/attention_fwd_performance` — both published variants
+  using only same-shape (toy 128×128) inputs:
+  `attn_fwd_v1` (nki.lang APIs: high-level `nl.matmul` with transpose
+  flags, `nl.transpose`, the softmax chain
+  `nl_reduce_2d_axis1_keepdims` + `nl_elementwise_unary_2d`,
+  `nisa_tensor_scalar_broadcast` for column-vector broadcast; surfaced
+  AUDIT Finding 12 on `nl_matmul` dtype contract);
+  `attn_fwd_v2` (ISA-level: `nisa_nc_matmul`, `nisa_nc_transpose`,
+  `nisa_tensor_reduce_2d_axis1`, `nisa_reciprocal_2d`,
+  `nisa_activation_no_scale`; reusable `softmax_isa` helper; extended
+  Finding 12 by sweeping the dtype relaxation to `ni_nc_matmul` /
+  `nisa_nc_matmul`; surfaced Finding 13 on the stationary/moving
+  operand-swap blind spot on symmetric shapes).
 
 Deferred:
 
@@ -281,8 +291,9 @@ Deferred:
   shape-and-bounds story; v1 of `attention_fwd_performance` retired
   the basic softmax-chain prerequisite, but pipelining and producer/
   consumer queues are still unmodelled.
-- `tutorials/attention_fwd_performance` v2 / v3 — same primitives
-  as v1, larger blocked layouts. Pending per ROADMAP.
+- `tutorials/attention_fwd_performance` v3 — same ISA primitives as
+  v2, larger blocked layout (`seqlen_q >= 512`, 4-D `qk` tile, `nl.ds`
+  dynamic-slice indexer). Pending per ROADMAP.
 - `tutorials/mxfp-matmul` — Microscaled-FP quantization; dtype-heavy
   and shape-light, so verification depth is low for this PoC's model.
 
@@ -324,7 +335,7 @@ of bugs caught here — wrong slice arithmetic, mismatched tile shapes
 between operands, partition-dim limit violations, hardware-shape
 violations on the matmul unit — are exactly the high-volume failure
 modes a static checker can address up front. The PoC shows that the
-engineering surface is small (a single ~720-line stub library covers
-sixteen NKI kernel functions across six tutorials and four contributed
-kernels) and that the verifier is fast (the full 39-target suite
+engineering surface is small (a single ~820-line stub library covers
+seventeen NKI kernel functions across six tutorials and four contributed
+kernels) and that the verifier is fast (the full 41-target suite
 finishes in about four minutes).

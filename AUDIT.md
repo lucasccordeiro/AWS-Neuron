@@ -325,13 +325,71 @@ mixed-precision stationary and moving operands and the hardware casts.
 
 **Resolution**: relaxed `nl_matmul`'s dtype check to shape-only;
 contraction-axis equality, PMAX limit on K, and GEMM_STATIONARY_FMAX /
-GEMM_MOVING_FMAX limits on M, N remain. The lower-level
-`ni_nc_matmul` and `nisa_nc_matmul` stubs retain strict dtype equality —
-their callers (the matrix_multiplication tutorial family) use uniform
-fp16 throughout, so the strict contract is well-tested there. If a
-future port surfaces a mixed-precision use of either of those, sweep them
-similarly.
+GEMM_MOVING_FMAX limits on M, N remain.
 
-**Lesson** (reinforces Finding 10's): a cross-precision incident on a
-high-level NKI primitive doesn't automatically transfer to its low-level
-ISA cousins. Each layer needs its own evidence base; relax conservatively.
+**Sweep follow-up (attn_fwd_v2 port).** The conservative position
+recorded in this finding's first revision — "the lower-level
+`ni_nc_matmul` / `nisa_nc_matmul` stubs retain strict dtype equality" —
+broke at the very next port. `attn_fwd_v2` uses
+`nisa.nc_matmul(dst=attn_out, stationary=scores_t, moving=v_t)` with
+`scores_t` (fp32, from the softmax chain) and `v_t` (v's dtype, fp16).
+Same mixed-precision pattern, ISA-level form. Relaxed both
+`ni_nc_matmul` and `nisa_nc_matmul` dtype checks to shape-only as part
+of the v2 port. Shape, partition-axis, and stationary/moving FMAX
+contracts remain.
+
+**Lesson** (revises Finding 10's): a cross-precision incident on a
+high-level NKI primitive *does* usually transfer to its low-level ISA
+cousins — the two forms are typically backed by the same hardware path.
+The "relax conservatively, prove the high-level case first" heuristic
+cost one extra port-and-fix cycle here. Updated heuristic: when
+relaxing a dtype contract, default to sweeping the explicit-dst /
+returning-form cousin in the same patch unless there's positive
+evidence the contract should differ.
+
+---
+
+## Finding 13 — ISA matmul stationary/moving operand-swap blind spot on symmetric shapes
+
+Surfaced during the attn_fwd_v2 port code review.
+
+`nisa_nc_matmul(dst, stationary, moving)` and `ni_nc_matmul(stationary, moving)`
+enforce `stationary.d1 <= GEMM_STATIONARY_FMAX` and `moving.d1 <= GEMM_MOVING_FMAX`
+(128 and 512 respectively). When both operands fit *both* bounds — for
+example, on 128 × 128 toy attention inputs — swapping `stationary` and
+`moving` is undetectable at the shape level: the swapped call still
+satisfies all current preconditions.
+
+Concretely, in attn_fwd_v2:
+```
+nisa_nc_matmul(qk, q_sbuf, k_sbuf)
+```
+swapped to
+```
+nisa_nc_matmul(qk, k_sbuf, q_sbuf)
+```
+produces a semantically different matmul (different stationary tile,
+which materially changes Neuron's compute schedule) but our verifier
+returns SUCCESSFUL.
+
+**Status**: documented limitation; not patched. The shape-only contract is
+correct as far as it goes — both operands fit on the moving FMAX, so they
+fit on the stationary FMAX as well. Tightening would require modelling
+the *intended* role of each operand (which the upstream NKI source
+records in keyword-arg form, but the stub takes positionally), or adding
+an explicit "stationary operand has this role" tag on Tile, which is more
+modelling surface than this PoC has absorbed.
+
+**Practical impact**: the toy 128×128 v1/v2 ports are blind to this
+swap. v3 (`seqlen_q >= 512`, asymmetric blocked) breaks the symmetry
+naturally — `q` blocks are FMAX_STATIONARY = 128 wide on the free dim and
+`k` blocks are FMAX_MOVING = 512 wide, so swapping operands fails the
+FMAX bounds on at least one. Recorded for the v3 port: confirm the
+discrimination there.
+
+**Lesson**: shape-only contracts on operand-role-bearing primitives
+(matmul, transpose where the source partition axis matters, etc.) have
+a symmetry blind spot when the toy shape happens to satisfy *all*
+relevant bounds. Asymmetric stress shapes are the cheap discriminator;
+add them at the harness level when porting kernels whose contracts have
+this property.
