@@ -182,9 +182,13 @@ three local conventions:
 2. **`@nki.jit` decorator stripped.** Trivial — `nki.jit` is an
    unmodelled symbol, not an ESBMC limitation.
 3. **Tile slicing `a[i:j, k:l]` → `slice2d(a, i, j, k, l)`.** The only
-   active *source* rewrite. Stays in place while
-   [esbmc/esbmc#4523](https://github.com/esbmc/esbmc/issues/4523)
-   (slice expressions on user `__getitem__`) is open.
+   active *source* rewrite. The conversion-time blocker was
+   esbmc/esbmc#4523 (closed by
+   [PR #4528](https://github.com/esbmc/esbmc/pull/4528)); the
+   remaining gate is
+   [esbmc/esbmc#4537](https://github.com/esbmc/esbmc/issues/4537),
+   slice values not threading into user-defined `__getitem__`
+   parameters.
 
 For-loops are native (`for m in nl_affine_range(N):`); tuple
 destructuring is native (`M, N = a.shape`); the `nl_affine_range`
