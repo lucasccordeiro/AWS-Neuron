@@ -195,11 +195,16 @@ three local conventions:
 3. **Tile slicing `a[i:j, k:l]` → `slice2d(a, i, j, k, l)`.** The only
    active *source* rewrite. The conversion-time blocker was
    esbmc/esbmc#4523 (closed by
-   [PR #4528](https://github.com/esbmc/esbmc/pull/4528)); the
-   remaining gate is
-   [esbmc/esbmc#4537](https://github.com/esbmc/esbmc/issues/4537),
-   slice values not threading into user-defined `__getitem__`
-   parameters.
+   [PR #4528](https://github.com/esbmc/esbmc/pull/4528)); single-slice
+   propagation into user-defined `__getitem__` (esbmc/esbmc#4537) was
+   closed by
+   [PR #4538](https://github.com/esbmc/esbmc/pull/4538) — `a[i:j]`
+   now works natively. The residual gate is the multi-axis case
+   ([esbmc/esbmc#4539](https://github.com/esbmc/esbmc/issues/4539)):
+   the tuple of slices is constructed at the call site but the backing
+   list reaches `__getitem__` empty, so `key[0]` reads out of bounds.
+   Until #4539 closes, all 125 `slice2d` / `slice_cols` / `slice_3d_at`
+   call sites stay in place.
 
 For-loops are native (`for m in nl_affine_range(N):`); tuple
 destructuring is native (`M, N = a.shape`); the `nl_affine_range`
