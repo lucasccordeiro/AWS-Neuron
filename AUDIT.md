@@ -205,3 +205,42 @@ under the old single-file structure (each copy of the stub library
 would have had its own strict equality check; tightening one would not
 have caught the issue in the others). The canonical-stubs structure
 plus end-to-end `make verify` is exactly the workflow that surfaces it.
+
+---
+
+## Finding 10 — over-strict dtype checks on `nisa.dma_copy` and `nisa.tensor_tensor`
+
+Surfaced when porting `matrix_multiplication/nki_matmul_fully_optimized_`.
+The tutorial keeps a per-(m, bm, bn) SBUF accumulator allocated with
+the kernel's output dtype (e.g. fp16), and inside the K-block loop
+performs `nisa.tensor_tensor(dst=acc, data1=acc, data2=psum_result, op=nl.add)`
+where `psum_result` is fp32 (PSUM-resident from `nisa.nc_matmul`). The
+final write-back uses `nisa.dma_copy(dst=hbm_fp16_slice, src=sbuf_fp32_packed)`
+— another cross-dtype move.
+
+Both copies are legal in NKI; the engines handle the cast at runtime.
+The stubs encoded too-strict contracts:
+
+  - `nisa_dma_copy` asserted `dst.dtype == src.dtype`.
+  - `nisa_tensor_tensor` asserted three-way dtype equality
+    (`dst.dtype == a.dtype` and `a.dtype == b.dtype`).
+
+Both rejected the well-formed `matmul_fully_optimized` port.
+
+**Root cause**: I had relaxed `nisa.tensor_copy`'s dtype check during
+AUDIT Finding 9, but the same pattern applies to *every* shape-only
+ISA-level copy primitive — `dma_copy`, `tensor_tensor`, `tensor_copy`.
+A single-kernel finding led me to fix only that kernel's site; the
+broader pattern surfaced two ports later.
+
+**Resolution**: relaxed both contracts to shape-only. Spot-checked
+that every existing target still verifies with the relaxation; the
+two-direction CEXes still fire at the correct stub sites for the
+buggy variants (no buggy verdict was inadvertently masked, because
+each buggy variant injects an index/slice bug rather than a dtype
+mismatch).
+
+**Lesson**: a contract-tightness finding on one primitive deserves
+a sweep across primitives of the same shape (shape-only ISA copies in
+this case). Updating one stub and not the cousins leaves the same
+incident waiting to happen at the next port.

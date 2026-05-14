@@ -59,6 +59,18 @@ asserts the kernel's output contract.
 | `maxpooling_symbolic` | `maxpooling_symbolic.py` | `kernels/maxpooling.py` | `SUCCESSFUL` (`--unwind 5`; H = k·128, k ∈ [1, 4]) |
 | `mamba_v1_symbolic` | `mamba_v1_symbolic.py` | `kernels/mamba_v1.py` | `SUCCESSFUL` (`--unwind 5`; state ∈ [1, 4], seq ∈ [2, 8]) |
 | `interpolate_bilinear_symbolic` | `interpolate_bilinear_symbolic.py` | `kernels/interpolate_bilinear.py` | `SUCCESSFUL` (`--unwind 5`; H_src, W_src ∈ {10, 19, 28}) |
+| `matmul_tiled` | `matmul_tiled.py` | `kernels/matmul_tiled.py` | `SUCCESSFUL` |
+| `matmul_tiled_buggy` | `matmul_tiled_buggy.py` | `kernels/matmul_tiled_buggy.py` | `FAILED` |
+| `matmul_hoist_load` | `matmul_hoist_load.py` | `kernels/matmul_hoist_load.py` | `SUCCESSFUL` |
+| `matmul_hoist_load_buggy` | `matmul_hoist_load_buggy.py` | `kernels/matmul_hoist_load_buggy.py` | `FAILED` |
+| `matmul_block_free` | `matmul_block_free.py` | `kernels/matmul_block_free.py` | `SUCCESSFUL` |
+| `matmul_block_free_buggy` | `matmul_block_free_buggy.py` | `kernels/matmul_block_free_buggy.py` | `FAILED` |
+| `matmul_fully_optimized` | `matmul_fully_optimized.py` | `kernels/matmul_fully_optimized.py` | `SUCCESSFUL` |
+| `matmul_fully_optimized_buggy` | `matmul_fully_optimized_buggy.py` | `kernels/matmul_fully_optimized_buggy.py` | `FAILED` |
+| `mamba_v2` | `mamba_v2.py` | `kernels/mamba_v2.py` | `SUCCESSFUL` |
+| `mamba_v2_buggy` | `mamba_v2_buggy.py` | `kernels/mamba_v2_buggy.py` | `FAILED` |
+| `mamba_v3` | `mamba_v3.py` | `kernels/mamba_v3.py` | `SUCCESSFUL` |
+| `mamba_v3_buggy` | `mamba_v3_buggy.py` | `kernels/mamba_v3_buggy.py` | `FAILED` |
 
 `verify.py` is the single source of truth for these pairings, the ESBMC
 flags, and the expected verdicts.
@@ -77,7 +89,7 @@ python3 verify.py NAME   # run a single target
 Concrete-shape targets complete in 1–3 seconds wall-clock each on a
 stock laptop. The five symbolic-shape targets run for ~5–60 seconds
 depending on the size of the shape family they sweep. The full suite
-(22 targets) finishes in about 3 minutes wall-clock end-to-end.
+(34 targets) finishes in about 4 minutes wall-clock end-to-end.
 
 ## Where to read more
 

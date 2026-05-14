@@ -183,20 +183,25 @@ def slab_cols_set(t: Tile3D, k: int, c0: int, c1: int, value: Tile) -> None:
 
 # ============================================================== ISA operations
 
-# nisa.dma_copy(dst, src): shapes and dtypes must match.
+# nisa.dma_copy(dst, src): shapes must match. Dtype need not — like
+# nisa.tensor_copy and nisa.tensor_tensor, DMA copy is shape-only at the
+# stub level; NKI permits cross-dtype moves (e.g. fp32 PSUM → fp16 HBM
+# in matmul_fully_optimized) and the engine handles the cast.
+# (Audit Finding 10.)
 def nisa_dma_copy(dst: Tile, src: Tile) -> None:
     assert dst.d0 == src.d0
     assert dst.d1 == src.d1
-    assert dst.dtype == src.dtype
 
-# nisa.tensor_tensor(dst, a, b, op): ternary shape and dtype equality.
+# nisa.tensor_tensor(dst, a, b, op): ternary shape equality. Dtypes need
+# not all match — NKI permits mixed-precision accumulation (e.g. adding
+# an fp32 PSUM result into an fp16 SBUF accumulator) and the hardware
+# does the cast. dst inherits its dtype from the kernel's allocation.
+# (Audit Finding 10, surfaced by matmul_fully_optimized.)
 def nisa_tensor_tensor(dst: Tile, a: Tile, b: Tile) -> None:
     assert dst.d0 == a.d0
     assert a.d0  == b.d0
     assert dst.d1 == a.d1
     assert a.d1  == b.d1
-    assert dst.dtype == a.dtype
-    assert a.dtype  == b.dtype
 
 # 3-D tensor slice with one scalar axis and two range axes:
 #   src[i, r0:r1, c0:c1]  (scalar i drops axis 0; result is 2-D)
@@ -281,6 +286,12 @@ def iadd(dst: Tile, other: Tile) -> None:
 # nl.loop_reduce(tile, op, loop_indices, dtype) — identity on shape, changes dtype.
 def nl_loop_reduce(tile: Tile, dtype: int) -> Tile:
     return Tile(tile.d0, tile.d1, dtype, tile.buffer)
+
+# nisa.memset(dst, value) — initialise every element of `dst` to a constant.
+# Shape-only model: the value doesn't enter the verifier; there is no contract
+# to assert beyond the tile already existing.
+def nisa_memset(dst: Tile) -> None:
+    pass
 
 # ============================================================== Fancy indexing
 # IndexTensor abstracts a multi-dim index tensor (e.g. produced by nl.mgrid)

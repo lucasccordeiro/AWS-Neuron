@@ -19,21 +19,23 @@ the expected effort. The tiering reflects effort, not preference.
 
 22 build targets across 9 kernels.
 
-## Tier 1 — uses only existing stubs
+## Tier 1 — uses only existing stubs (DONE)
 
-Mechanical ports. Each is a copy-and-rewrite of an existing port with
-a different loop nest. Nothing new in `stubs.py`.
+All six variants landed. Each is a copy-and-rewrite of an existing
+port with a different loop nest. One new stub (`nisa_memset`) was
+added during the `fully_optimized` port; two existing stubs relaxed
+(`nisa_dma_copy`, `nisa_tensor_tensor`) per AUDIT Finding 10.
 
-| Module | What it adds | Effort |
-|---|---|---|
-| `tutorials/matrix_multiplication/nki_matmul_tiled_` | 3-dim tiling | ~30 min |
-| `tutorials/matrix_multiplication/nki_matmul_hoist_load_` | hoists `rhs` load | ~30 min |
-| `tutorials/matrix_multiplication/nki_matmul_block_free_dimension_` | adds block-free-dim | ~45 min |
-| `tutorials/matrix_multiplication/nki_matmul_fully_optimized_` | combines all | ~45 min |
-| `tutorials/fused_mamba/mamba_v2` | hoists `delta`/`u` loads | ~45 min |
-| `tutorials/fused_mamba/mamba_v3` | further reorg | ~45 min |
+| Module | Status |
+|---|---|
+| `tutorials/matrix_multiplication/nki_matmul_tiled_` | ✅ |
+| `tutorials/matrix_multiplication/nki_matmul_hoist_load_` | ✅ |
+| `tutorials/matrix_multiplication/nki_matmul_block_free_dimension_` | ✅ |
+| `tutorials/matrix_multiplication/nki_matmul_fully_optimized_` | ✅ |
+| `tutorials/fused_mamba/mamba_v2` | ✅ |
+| `tutorials/fused_mamba/mamba_v3` | ✅ |
 
-Total ~4-5 h, +12 build targets.
++12 build targets. Total: 34.
 
 ## Tier 2 — one new stub
 
@@ -88,9 +90,9 @@ Skip unless dtype modelling becomes a goal.
 
 ## End-state estimates
 
-| Through | Targets | Cumulative effort |
+| Through | Targets | Status |
 |---|---|---|
-| Tier 1 | 34 | ~5 h |
-| Tier 1 + Tier 2 | 36 | ~6 h |
-| Tier 1 + Tier 2 + Tier 3 pilot | 38 | ~10 h |
-| All of Tier 3 (incl. pipelined_attention) | ~42 | ~14 h |
+| Tier 1 | 34 | **DONE** |
+| Tier 1 + Tier 2 | 36 | pending |
+| Tier 1 + Tier 2 + Tier 3 pilot | 38 | pending |
+| All of Tier 3 (incl. pipelined_attention) | ~42 | pending |

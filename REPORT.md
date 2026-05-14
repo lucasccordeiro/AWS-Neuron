@@ -71,6 +71,13 @@ descending order of how much we trust each:
    - **Finding 9** — `nisa.tensor_copy` asserted dtype equality, but
      the matmul tutorial uses it as a PSUM-fp32 → SBUF-fp16 cast.
      Contract relaxed to shape-only.
+   - **Finding 10** — same dtype-strictness pattern on
+     `nisa.dma_copy` and `nisa.tensor_tensor` surfaced one port
+     later (matmul_fully_optimized accumulates fp32 PSUM into fp16
+     SBUF, then DMAs fp32 SBUF into fp16 HBM). Both contracts
+     relaxed to shape-only. Lesson: relaxing one shape-only ISA copy
+     primitive's dtype check should trigger a sweep across the
+     cousins.
 
 ### Fancy indexing: nondet representative elements
 
@@ -143,6 +150,7 @@ nisa_tensor_tensor_scan             # associative scan (shape-passthrough)
 nl_broadcast_to                     # 1-axis broadcast to a new shape
 slice_3d_at                         # 3-D tensor with scalar + range axes
 iadd, nl_loop_reduce                # accumulation in PSUM, loop reduction
+nisa_memset                         # in-place initialise (shape-only)
 
 # Fancy indexing (mgrid, masked load/store, masked reduction)
 mgrid_axis, index_add, index_add_scalar,
@@ -214,13 +222,22 @@ Tutorials covered:
 
 - `tutorials/tensor_addition` and `tutorials/transpose2d` — the small
   pedagogical examples that started the port.
-- `tutorials/matrix_multiplication::nki_matmul_basic_` — fixed
-  64×128×512 matmul using `nisa.nc_matmul` (explicit-destination form,
-  distinct from the returning `ni.nc_matmul` exercised by
-  `contributed/matmul.py`). The port surfaced AUDIT Finding 9.
-- `tutorials/fused_mamba::mamba_v1` — selective state-space model
-  (real production ML kernel). New stubs: `nisa.activation`,
-  `nl.broadcast_to`, `nisa.tensor_tensor_scan`, `slice_3d_at`.
+- `tutorials/matrix_multiplication` — all five published variants:
+  `nki_matmul_basic_` (single-tile baseline; surfaced AUDIT Finding 9
+  on `nisa.tensor_copy` doubling as a PSUM-fp32 → SBUF-fp16 cast),
+  `nki_matmul_tiled_` (3-dim tile-and-accumulate),
+  `nki_matmul_hoist_load_` (hoists per-k lhsT loads),
+  `nki_matmul_block_free_dimension_` (adds M/N blocking — upstream
+  uses nested Python lists, ported as flat Tile3D slabs),
+  `nki_matmul_fully_optimized_` (blocks all of M/N/K; surfaced AUDIT
+  Finding 10 on `nisa.dma_copy` and `nisa.tensor_tensor` dtype
+  contracts being too strict).
+- `tutorials/fused_mamba` — all three published variants:
+  `mamba_v1` (introduced `nisa.activation`, `nl.broadcast_to`,
+  `nisa.tensor_tensor_scan`, `slice_3d_at`), `mamba_v2` (hoists
+  delta/u loads out of the state loop), `mamba_v3` (adds an inner
+  seq-tile loop with column-strip slicing into existing SBUF tiles
+  and a `scan_init` accumulator carried across seq tiles).
 
 Deferred:
 
@@ -259,7 +276,7 @@ of bugs caught here — wrong slice arithmetic, mismatched tile shapes
 between operands, partition-dim limit violations, hardware-shape
 violations on the matmul unit — are exactly the high-volume failure
 modes a static checker can address up front. The PoC shows that the
-engineering surface is small (a single ~620-line stub library covers
-nine kernel families across two tutorials and four contributed
-kernels) and that the verifier is fast (the full 22-target suite
-finishes in about three minutes).
+engineering surface is small (a single ~640-line stub library covers
+thirteen kernel families across four tutorials and four contributed
+kernels) and that the verifier is fast (the full 34-target suite
+finishes in about four minutes).

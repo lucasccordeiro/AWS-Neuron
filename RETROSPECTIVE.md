@@ -6,13 +6,13 @@ assumes familiarity with the verifier but not with NKI.
 
 ## TL;DR
 
-- **9 NKI kernel families ported**, 22 build targets (concrete +
+- **13 NKI kernel families ported**, 34 build targets (concrete +
   positive-control + 5 symbolic-shape variants), 100 % pass rate
-  against expected verdicts; full regression in about 3 minutes
+  against expected verdicts; full regression in about 4 minutes
   wall-clock on Bitwuzla.
 - **6 ESBMC Python-frontend issues filed upstream**, 2 already
   fixed-and-merged (#4509, #4510). 4 still open (#4513–#4516).
-- **2 stub-correctness incidents (AUDIT.md Findings 8 and 9)** caught by
+- **3 stub-correctness incidents (AUDIT.md Findings 8, 9 and 10)** caught by
   the verifier on the first run of a freshly ported kernel — both would
   have shipped silently in the original per-file duplicated-stubs layout.
 - **One novel verification pattern** (nondet representative elements for
@@ -128,7 +128,7 @@ their issues close.
 ## Stub-correctness incidents (AUDIT.md)
 
 The trusted base of any model-driven verification is the stub library
-itself. Two contract-tightness bugs in our stubs were found *by ESBMC*,
+itself. Three contract-tightness bugs in our stubs were found *by ESBMC*,
 on the very first run of a freshly ported kernel that had been believed
 correct:
 
@@ -150,7 +150,16 @@ correct:
   `VERIFICATION FAILED` on the dtype check; relaxed the contract to
   shape-only.
 
-Both findings were exposed by the canonical-stubs + manifest-driven
+- **Finding 10 — `nisa_dma_copy` and `nisa_tensor_tensor` over-strict
+  dtype (matmul_fully_optimized port).** Same dtype-strictness pattern
+  as Finding 9, on the cousin primitives, but only surfaced two ports
+  later when the tutorial that genuinely exercises cross-dtype DMA
+  and accumulation finally landed. Lesson: when one shape-only ISA
+  copy primitive's dtype contract is relaxed, sweep the cousins —
+  Finding 9 should have surfaced the dma_copy / tensor_tensor cases
+  immediately rather than waiting for matmul_fully_optimized.
+
+The three findings were exposed by the canonical-stubs + manifest-driven
 `verify` workflow. Under the original per-file duplicated-stubs layout
 (eight self-contained PoC files), neither would have been caught — each
 file's stub library was an independent copy and contracts had already

@@ -73,6 +73,19 @@ MANIFEST: list[Target] = [
     Target("mamba_v1_symbolic",          "mamba_v1_symbolic.py",          ("--unwind", "5"), "SUCCESSFUL"),
     Target("interpolate_bilinear_symbolic", "interpolate_bilinear_symbolic.py",
                                                                                  ("--unwind", "5"), "SUCCESSFUL"),
+    Target("matmul_tiled",               "matmul_tiled.py",                      (),                "SUCCESSFUL"),
+    Target("matmul_tiled_buggy",         "matmul_tiled_buggy.py",                (),                "FAILED"),
+    Target("matmul_hoist_load",          "matmul_hoist_load.py",                 (),                "SUCCESSFUL"),
+    Target("matmul_hoist_load_buggy",    "matmul_hoist_load_buggy.py",           (),                "FAILED"),
+    Target("matmul_block_free",          "matmul_block_free.py",                 (),                "SUCCESSFUL"),
+    Target("matmul_block_free_buggy",    "matmul_block_free_buggy.py",           (),                "FAILED"),
+    Target("matmul_fully_optimized",     "matmul_fully_optimized.py",            (),                "SUCCESSFUL"),
+    Target("matmul_fully_optimized_buggy",
+                                         "matmul_fully_optimized_buggy.py",     (),                "FAILED"),
+    Target("mamba_v2",                   "mamba_v2.py",                          (),                "SUCCESSFUL"),
+    Target("mamba_v2_buggy",             "mamba_v2_buggy.py",                    (),                "FAILED"),
+    Target("mamba_v3",                   "mamba_v3.py",                          (),                "SUCCESSFUL"),
+    Target("mamba_v3_buggy",             "mamba_v3_buggy.py",                    (),                "FAILED"),
 ]
 
 
