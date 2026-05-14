@@ -74,6 +74,8 @@ asserts the kernel's output contract.
 | `mamba_v3_buggy` | `mamba_v3_buggy.py` | `kernels/mamba_v3_buggy.py` | `FAILED` |
 | `avgpool` | `avgpool.py` | `kernels/avgpool.py` | `SUCCESSFUL` |
 | `avgpool_buggy` | `avgpool_buggy.py` | `kernels/avgpool_buggy.py` | `FAILED` |
+| `attn_fwd_v1` | `attn_fwd_v1.py` | `kernels/attn_fwd_v1.py` | `SUCCESSFUL` |
+| `attn_fwd_v1_buggy` | `attn_fwd_v1_buggy.py` | `kernels/attn_fwd_v1_buggy.py` | `FAILED` |
 
 `verify.py` is the single source of truth for these pairings, the ESBMC
 flags, and the expected verdicts.
@@ -92,7 +94,7 @@ python3 verify.py NAME   # run a single target
 Concrete-shape targets complete in 1–3 seconds wall-clock each on a
 stock laptop. The five symbolic-shape targets run for ~5–60 seconds
 depending on the size of the shape family they sweep. The full suite
-(37 targets) finishes in about 4 minutes wall-clock end-to-end.
+(39 targets) finishes in about 4 minutes wall-clock end-to-end.
 
 ## Where to read more
 
@@ -110,7 +112,7 @@ depending on the size of the shape family they sweep. The full suite
 - ESBMC: https://github.com/esbmc/esbmc — 8.3.0, default Bitwuzla solver.
 - NKI samples: https://github.com/aws-neuron/nki-samples — the
   `tensor_addition`, `transpose2d`, `matrix_multiplication`,
-  `fused_mamba`, `average_pool2d` tutorials and the
-  `contributed/{matmul, maxpooling, interpolate_bilinear_fwd,
-  interpolate_trilinear_fwd}` community kernels. Pinned snapshot
-  `a87aaa44`.
+  `fused_mamba`, `average_pool2d`, `attention_fwd_performance` (v1)
+  tutorials and the `contributed/{matmul, maxpooling,
+  interpolate_bilinear_fwd, interpolate_trilinear_fwd}` community
+  kernels. Pinned snapshot `a87aaa44`.

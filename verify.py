@@ -90,6 +90,8 @@ MANIFEST: list[Target] = [
     Target("mamba_v3_buggy",             "mamba_v3_buggy.py",                    (),                "FAILED"),
     Target("avgpool",                    "avgpool.py",                           (),                "SUCCESSFUL"),
     Target("avgpool_buggy",              "avgpool_buggy.py",                     (),                "FAILED"),
+    Target("attn_fwd_v1",                "attn_fwd_v1.py",                       (),                "SUCCESSFUL"),
+    Target("attn_fwd_v1_buggy",          "attn_fwd_v1_buggy.py",                 (),                "FAILED"),
 ]
 
 

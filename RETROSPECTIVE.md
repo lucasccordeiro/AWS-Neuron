@@ -6,8 +6,8 @@ assumes familiarity with the verifier but not with NKI.
 
 ## TL;DR
 
-- **15 NKI kernel functions ported** (across 9 upstream source files —
-  5 tutorials, 4 community-`contributed/` kernels), 37 build targets
+- **16 NKI kernel functions ported** (across 10 upstream source files —
+  6 tutorials, 4 community-`contributed/` kernels), 39 build targets
   (concrete + positive-control + 5 symbolic-shape variants + 1
   historical-bug reproduction), 100 % pass rate against expected
   verdicts; full regression in about 4 minutes wall-clock on Bitwuzla.
@@ -17,8 +17,8 @@ assumes familiarity with the verifier but not with NKI.
   [aws-neuron/nki-samples#74](https://github.com/aws-neuron/nki-samples/pull/74)
   (pre-fix `nki_matmul_hoist_load_` allocated lhsT slab with the wrong
   free-dim); reproduced as the `matmul_hoist_load_historical` target.
-- **3 stub-correctness incidents (AUDIT.md Findings 8, 9 and 10)** caught by
-  the verifier on the first run of a freshly ported kernel — both would
+- **4 stub-correctness incidents (AUDIT.md Findings 8, 9, 10, 12)** caught by
+  the verifier on the first run of a freshly ported kernel — all would
   have shipped silently in the original per-file duplicated-stubs layout.
 - **One novel verification pattern** (nondet representative elements for
   fancy-index bound checks) which generalised across maxpooling, both
@@ -54,6 +54,7 @@ filed ESBMC issue (#4514–#4516).
 | `tutorials/matrix_multiplication/matrix_multiplication_nki_kernels.py` (all five variants: basic / tiled / hoist_load / block_free / fully_optimized) | tutorials | good + buggy each; plus `matmul_hoist_load_historical` reproducing pre-fix bug from nki-samples#74 |
 | `tutorials/fused_mamba/mamba_nki_kernels.py` (v1 / v2 / v3) | tutorials | good + buggy each; v1 also symbolic-shape |
 | `tutorials/average_pool2d/average_pool2d_nki_kernels.py` | tutorials | good + buggy (introduces `Tile5D`, `tile3d_ap_5d`) |
+| `tutorials/attention_fwd_performance/attention_kernels.py::attn_fwd_v1` | tutorials | good + buggy (introduces `nl_matmul` with transpose flags, `nl_transpose_2d`, softmax-chain reductions, `nisa_tensor_scalar_broadcast`; surfaced AUDIT Finding 12 on `nl_matmul` dtype contract) |
 | `contributed/matmul.py` | community | good (two sizes) + buggy |
 | `contributed/maxpooling.py` | community | good + buggy + symbolic-shape |
 | `contributed/interpolate_bilinear_fwd.py` | community | good + buggy + symbolic-shape |
@@ -76,6 +77,12 @@ Catalogued at a glance to show breadth:
 - **Access-pattern views**: `tile3d_ap_5d` (constant-stride 5-D view
   of a 3-D tile, with `Σ stride · (count−1) < src_volume` bound),
   `nl_sum_5d_axes34_to_3d` (reduction)
+- **Attention primitives**: `nl_matmul` (high-level `nl.matmul` with
+  `transpose_x` / `transpose_y` flags, shape-only dtype contract per
+  AUDIT Finding 12), `nl_transpose_2d`, `nl_reduce_2d_axis1_keepdims`
+  (covers `nl.max` and `nl.sum`), `nl_elementwise_unary_2d` (covers
+  `nl.exp` and `nl.reciprocal`), `nisa_tensor_scalar_broadcast`,
+  `nl_load_2d_full` / `nl_store_2d_full`
 - **Matmul**: `ni_nc_matmul` (returning form), `nisa_nc_matmul`
   (explicit-destination form) — with par-dim ≤ PMAX and GEMM-FMAX limits
 - **Accumulation / reduction**: `iadd` (PSUM), `nl_loop_reduce`,

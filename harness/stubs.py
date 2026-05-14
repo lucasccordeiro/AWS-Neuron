@@ -650,6 +650,82 @@ def nl_max_fancy_3d_to_2d(in_tile: Tile3D,
     assert out_d0 <= PMAX
     return Tile(out_d0, out_d1, dtype, in_tile.buffer)
 
+# ============================================================== Attention primitives
+
+# nl.load(src) — load a full HBM 2-D tensor into SBUF. d0 is the partition axis.
+def nl_load_2d_full(src: Tile) -> Tile:
+    assert src.d0 <= PMAX
+    return Tile(src.d0, src.d1, src.dtype, BUF_SBUF)
+
+# nl.store(dst, value=tile) — write a full SBUF tile back to HBM. Shape match;
+# dtype not checked (NKI permits cross-dtype stores per AUDIT Finding 10's
+# pattern).
+def nl_store_2d_full(dst: Tile, value: Tile) -> None:
+    assert dst.d0 == value.d0
+    assert dst.d1 == value.d1
+
+# nl.matmul(x, y, transpose_x, transpose_y) — high-level matmul. The transpose
+# flags choose which axis of each operand is the contraction axis K:
+#   x is (M, K) if transpose_x=False else (K, M); contraction = x.d0 if
+#   transpose_x else x.d1.
+#   y is (K, N) if transpose_y=False else (N, K); contraction = y.d1 if
+#   transpose_y else y.d0.
+# Returns the (M, N) PSUM tile. Same hardware shape limits as ni_nc_matmul.
+# Dtype need not match across operands — the high-level nl.matmul accepts
+# mixed-precision inputs (e.g. fp32 stationary + fp16 moving, as in
+# attn_fwd_v1's second matmul `nl.matmul(scores_t_fp32, v_sbuf_t_fp16, ...)`);
+# the engine casts. (Audit Finding 12.)
+# TODO: tier the dtype contract once a port surfaces a non-fp16 moving
+# operand. Current evidence supports {fp32, fp16} stationary × fp16-family
+# moving; tightening prematurely would re-reject the very pattern that
+# motivated the relaxation.
+def nl_matmul(x: Tile, y: Tile, transpose_x: bool, transpose_y: bool) -> Tile:
+    if transpose_x:
+        m: int = x.d1
+        k_x: int = x.d0
+    else:
+        m: int = x.d0
+        k_x: int = x.d1
+    if transpose_y:
+        n: int = y.d0
+        k_y: int = y.d1
+    else:
+        n: int = y.d1
+        k_y: int = y.d0
+    assert k_x == k_y
+    assert k_x <= PMAX
+    assert m <= GEMM_STATIONARY_FMAX
+    assert n <= GEMM_MOVING_FMAX
+    return Tile(m, n, DT_F32, BUF_PSUM)
+
+# nl.transpose(t) — 2-D transpose returning a PSUM tile. d0 of the input must
+# fit in the partition dimension; output shape is (t.d1, t.d0).
+def nl_transpose_2d(t: Tile) -> Tile:
+    assert t.d0 <= PMAX
+    return Tile(t.d1, t.d0, t.dtype, BUF_PSUM)
+
+# Row-wise reduction with keepdims=True, axis=1. Models both nl.max and nl.sum
+# (and any other axis-1 reduction) — the operation distinction is semantic, not
+# shape-level. Output is the column-vector tile (t.d0, 1) with the caller-chosen
+# dtype (fp16 inputs typically lift into fp32 reductions).
+def nl_reduce_2d_axis1_keepdims(t: Tile, dtype: int) -> Tile:
+    return Tile(t.d0, 1, dtype, t.buffer)
+
+# Elementwise unary op with shape and dtype passthrough. Models nl.exp,
+# nl.reciprocal, and the rest of NKI's pointwise unary library.
+def nl_elementwise_unary_2d(t: Tile) -> Tile:
+    return Tile(t.d0, t.d1, t.dtype, t.buffer)
+
+# nisa.tensor_scalar(dst, data, op, operand) with a column-vector operand —
+# the (d0, 1) operand is broadcast across the free dim of `data`. Used in the
+# softmax chain to subtract row_max from each row and multiply by inverse-sum.
+# Shape-only on dtype, like the other ISA copy/elementwise primitives.
+def nisa_tensor_scalar_broadcast(dst: Tile, data: Tile, operand: Tile) -> None:
+    assert dst.d0 == data.d0
+    assert dst.d1 == data.d1
+    assert operand.d0 == data.d0
+    assert operand.d1 == 1
+
 # ============================================================== 5-D views (.ap)
 
 # Allocation for 5-D tiles. d0 is the partition axis.

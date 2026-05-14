@@ -55,16 +55,27 @@ silent on transpositions that happen to preserve total volume.
 
 ## Tier 3 — new primitive family
 
-| Module | New primitives | Effort |
+| Module | New primitives | Status |
 |---|---|---|
-| `tutorials/attention_fwd_performance` (v1) | `nl.matmul` (high-level), softmax chain (`nl.max(axis=)`, `nl.exp`, `nl.sum(axis=)`, `nl.reciprocal`), `nl.transpose`, masked elementwise | 3–4 h |
-| `tutorials/attention_fwd_performance` (v2+) | same primitives, different loop nest each | ~1 h each after v1 |
-| `contributed/pipelined_attention.py` | same family + producer/consumer pipelining | 2 h after v1 |
+| `tutorials/attention_fwd_performance` (v1) | `nl.matmul` (high-level), softmax chain (`nl_reduce_2d_axis1_keepdims`, `nl_elementwise_unary_2d`), `nl_transpose_2d`, `nisa_tensor_scalar_broadcast`, full-tile `nl_load_2d_full` / `nl_store_2d_full` | ✅ |
+| `tutorials/attention_fwd_performance` (v2+) | same primitives, different loop nest each | pending (~1 h each after v1) |
+| `contributed/pipelined_attention.py` | same family + producer/consumer pipelining | pending (~2 h after v1) |
 
 Attention is a flagship demo target. Most of the new stubs are
 passthrough on shape (softmax operates on shape, not value), so
 verification depth doesn't grow proportionally to effort — but the
 *coverage* claim is significant.
+
+**Toy-shape blind spot (v1).** The upstream v1 kernel uses uniformly
+128×128 inputs, which makes the contract suite blind to
+transpose-flag and operand-swap mutations: every input is square,
+every contraction axis is 128, so `k_x == k_y` and the matmul
+hardware-shape limits all hold regardless. A useful follow-up would
+be a second positive control with asymmetric shapes (e.g. fabricated
+(128, 64) Q against (128, 32) K) that would discriminate the
+remaining transpose / operand-order mutations. Recorded for v2+ — v2
+and v3 use larger fully-blocked layouts which already break the
+symmetry naturally.
 
 ## Tier 4 — likely lower payoff
 
@@ -99,5 +110,5 @@ Skip unless dtype modelling becomes a goal.
 |---|---|---|
 | Tier 1 | 34 | **DONE** |
 | Tier 1 + Tier 2 | 37 | **DONE** (incl. PR #74 historical-bug repro) |
-| Tier 1 + Tier 2 + Tier 3 pilot | 39 | pending |
+| Tier 1 + Tier 2 + Tier 3 pilot | 39 | **DONE** |
 | All of Tier 3 (incl. pipelined_attention) | ~43 | pending |

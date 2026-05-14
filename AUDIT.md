@@ -300,3 +300,38 @@ blind spot. The PoC's value proposition ("if it verifies, the shape
 math is correct") holds; the stronger claim ("if it verifies, the
 kernel runs on hardware") needs the partition-axis discipline
 modelled explicitly.
+
+---
+
+## Finding 12 — over-strict dtype check on `nl_matmul`
+
+Surfaced when porting `tutorials/attention_fwd_performance/attn_fwd_v1`.
+
+The kernel computes `attn_out = nl.matmul(scores_t, v_sbuf_t, transpose_x=True)`
+where `scores_t` is fp32 (allocated explicitly with `dtype=nl.float32` after
+the softmax chain) and `v_sbuf_t` inherits the input dtype (fp16 in the
+typical test harness). The first matmul in the same kernel uses uniform
+fp16 inputs, but the second deliberately mixes precisions — the upstream
+comment notes "v has the wrong layout" and transposes through PSUM, then
+recopies to SBUF at v's dtype, while `scores_t` is held in fp32 to preserve
+softmax precision.
+
+The initial stub asserted `x.dtype == y.dtype`, which rejected the
+well-formed second matmul.
+
+**Root cause**: same pattern as Findings 9 and 10 — high-level NKI ops
+that the engines handle as cross-dtype operations. `nl.matmul` accepts
+mixed-precision stationary and moving operands and the hardware casts.
+
+**Resolution**: relaxed `nl_matmul`'s dtype check to shape-only;
+contraction-axis equality, PMAX limit on K, and GEMM_STATIONARY_FMAX /
+GEMM_MOVING_FMAX limits on M, N remain. The lower-level
+`ni_nc_matmul` and `nisa_nc_matmul` stubs retain strict dtype equality —
+their callers (the matrix_multiplication tutorial family) use uniform
+fp16 throughout, so the strict contract is well-tested there. If a
+future port surfaces a mixed-precision use of either of those, sweep them
+similarly.
+
+**Lesson** (reinforces Finding 10's): a cross-precision incident on a
+high-level NKI primitive doesn't automatically transfer to its low-level
+ISA cousins. Each layer needs its own evidence base; relax conservatively.
