@@ -26,13 +26,97 @@ SPMD interactions, or anything below the level of the NKI Python API.
 ## Method in one paragraph
 
 Each NKI primitive (`nl.ndarray`, slicing, `nisa.dma_copy`,
-`nisa.tensor_tensor`, `nisa.tensor_copy`) becomes a Python function that
-tracks the tile's shape and dtype only, and asserts its precondition with
-plain `assert`. The kernel's loop structure, slice expressions and index
-arithmetic are preserved verbatim. ESBMC's Python frontend symbolically
-explores every iteration and reports either `VERIFICATION SUCCESSFUL` (all
-asserts hold on all paths) or `VERIFICATION FAILED` with a counterexample
-pinpointing the violated contract.
+`nisa.tensor_tensor`, `nisa.tensor_copy`, ...) becomes a Python function
+that tracks the tile's shape and dtype only, and asserts its
+precondition with plain `assert`. The kernel's loop structure, slice
+expressions and index arithmetic are preserved verbatim. ESBMC's Python
+frontend symbolically explores every iteration and reports either
+`VERIFICATION SUCCESSFUL` (all asserts hold on all paths) or
+`VERIFICATION FAILED` with a counterexample pinpointing the violated
+contract.
+
+### How each precondition is computed
+
+A stub's `assert` statements come from four sources, in roughly
+descending order of how much we trust each:
+
+1. **NeuronCore hardware constants.** A handful of immovable numbers
+   from the NeuronCore ISA: `PMAX = 128` (partition-dim limit for
+   SBUF and PSUM tiles), `GEMM_STATIONARY_FMAX = 128`,
+   `GEMM_MOVING_FMAX = 512` (per-axis bounds on the matmul unit's
+   inputs). These show up as bounds like `assert d0 <= PMAX` in
+   `nl_ndarray_2d` for SBUF tiles, and `assert a.d1 <= GEMM_STATIONARY_FMAX`
+   in `ni_nc_matmul`.
+2. **NKI runtime contracts read off the documentation.** Shape
+   equality on `nisa.dma_copy(dst, src)`, ternary shape equality on
+   `nisa.tensor_tensor`, three-way par-dim agreement on `nl.matmul`,
+   and so on. Each stub has a comment naming the contract it encodes.
+3. **Pure Python semantics of the construct being modelled.** Standard
+   slice-bounds (`0 <= r0 <= r1 <= src.d0` in `slice2d`); range
+   checks on integer indices (`0 <= k < t.d0` in `slab_get`); these
+   are non-NKI-specific and would apply to any container library.
+4. **Audit-driven refinement.** When ESBMC catches a contract being
+   wrong, the stub is corrected and the finding logged in `AUDIT.md`.
+   Two such incidents to date:
+   - **Finding 8** — the fancy-load mask predicate was modelled on
+     the combined row index rather than the base axis, masking real
+     bugs. Fixed by carrying the base axis and the row offset
+     separately so the correlation between them is preserved through
+     the nondet representatives.
+   - **Finding 9** — `nisa.tensor_copy` asserted dtype equality, but
+     the matmul tutorial uses it as a PSUM-fp32 → SBUF-fp16 cast.
+     Contract relaxed to shape-only.
+
+### Fancy indexing: nondet representative elements
+
+For `nl.mgrid`-style fancy indexing, each axis is modelled as an
+`IndexTensor(low, high)` carrying only its per-element value range.
+The stub for a fancy load / store / reduction introduces an
+unconstrained integer via `nondet_int()`, constrains it to `[low, high)`
+with `__ESBMC_assume`, and asserts the bound check on that
+representative. ESBMC then symbolically explores every value in
+the range; verifying "the bound holds for the nondet representative"
+is equivalent to verifying "the bound holds for every actual element
+of the index tensor", because every actual element lies in the same
+interval.
+
+### Is it sound?
+
+Two layers of soundness sit on top of each other; the answer is "yes
+for one, conditionally for the other":
+
+- **Verification soundness (ESBMC's BMC).** Given the stub contracts
+  as the ground truth, ESBMC's bounded model checking is sound up to
+  the unwinding bound: every path of length ≤ the bound is explored.
+  Five of our targets are explicitly symbolic and use `--unwind` to
+  bound the family they sweep; the other 17 use concrete shapes and
+  finite loops where unwinding is exhaustive. The verifier never says
+  `SUCCESSFUL` on a path it has not in fact explored.
+
+- **Model soundness (do the stub contracts correctly model NKI?).**
+  *Conditional*. The stub library is the trusted base of every verdict
+  in this repo. It can fail in two directions:
+    - **Too-strict** (false `FAILED`). The stub asserts a precondition
+      NKI doesn't actually require, and rejects a kernel that would
+      run correctly on hardware. AUDIT Finding 9 was an instance.
+    - **Too-loose** (false `SUCCESSFUL`). The stub misses a
+      precondition NKI does require, and accepts a kernel that would
+      fail at compile-time or runtime. AUDIT Finding 8 was an instance.
+
+  Both classes have surfaced in this PoC and been fixed. There is no
+  formal guarantee that the remaining stubs are tight against the NKI
+  specification — only that they are tight enough for every
+  well-formed kernel we have ported so far. The positive-control
+  buggy variant per kernel guards against silently-too-loose stubs
+  for at least one specific bug; symbolic-shape variants extend the
+  guard across a family of shapes.
+
+The honest read: this PoC is sound for the bugs it catches and the
+contracts it encodes. It is not a soundness proof against the NKI
+runtime — it is a shape-and-bound checker against a hand-written
+model of the NKI runtime. Strengthening the model toward formal
+parity with the runtime would require either NKI's own
+specification artefacts or a co-design exercise with the NKI team.
 
 ## Layout
 
