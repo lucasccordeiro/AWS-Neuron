@@ -92,9 +92,38 @@ Catalogued at a glance to show breadth:
 | [#4525](https://github.com/esbmc/esbmc/issues/4525) | **RESOLVED** ([PR #4529](https://github.com/esbmc/esbmc/pull/4529)) | range-alias / wrapper rewriter doesn't propagate across module imports | name resolution lands; iteration-count loss is the follow-on |
 | [#4533](https://github.com/esbmc/esbmc/issues/4533) | OPEN | cross-module range alias resolves but loses iteration-count info (unbounded unwinding) | keeps the per-kernel `nl_affine_range = range` rebind |
 
-The four open issues all have minimal repros in their bodies and would,
-collectively, retire every remaining concession the PoC makes against
-verbatim upstream NKI source.
+The remaining open issues all have minimal repros in their bodies and
+would, collectively, retire every remaining concession the PoC makes
+against verbatim upstream NKI source.
+
+## Source-rewriting history
+
+The kernels currently use the natural NKI syntax for almost everything:
+`for x in nl_affine_range(n):`, `M, N = a.shape`, `for-else`, slicing,
+arithmetic. Earlier in the project that was very much not the case —
+each upstream issue corresponded to a temporary source rewrite that
+made the kernel parseable but visually different from the upstream
+file. As the issues closed, each rewrite retired. Tracking how each
+one retired is useful both for the next person doing a port and for
+the ESBMC team to see what their fixes unblocked end-to-end.
+
+| Rewrite | Earlier form | Retired by | Current form |
+|---|---|---|---|
+| `for x in nl.affine_range(n):` | `x: int = 0; while x < n: ...; x = x + 1` | [PR #4521](https://github.com/esbmc/esbmc/pull/4521) (closing #4516) + [PR #4534](https://github.com/esbmc/esbmc/pull/4534) (transitive) | native `for x in nl_affine_range(n):` |
+| `nl_affine_range = range` rebind | per-kernel local rebind required | (residual) | still required while [#4533](https://github.com/esbmc/esbmc/issues/4533) is open — cross-module-propagated alias loses iteration-count info |
+| `M, N = a.shape` | `M: int = a.d0; N: int = a.d1` (per axis) | [PR #4524](https://github.com/esbmc/esbmc/pull/4524) (closing #4515) + [PR #4534](https://github.com/esbmc/esbmc/pull/4534) (closing #4532, the destructure-in-arithmetic-if-cond follow-on) | native tuple destructure |
+| Bare `var: int` declarations inside `while` | `var: int = 0` initialiser shim | [PR #4511](https://github.com/esbmc/esbmc/pull/4511) (closing #4510) | declarations without initializer where natural |
+| Same-name entry script + imported kernel | `verify_<name>.py` prefix to disambiguate | [PR #4517](https://github.com/esbmc/esbmc/pull/4517) (closing #4513) | entry scripts share the kernel's basename |
+| `from kernels.X import Y` reaching `from stubs import Z` | build-time concatenation of stubs + kernel + harness into one file | [PR #4512](https://github.com/esbmc/esbmc/pull/4512) (closing #4509) | native multi-file imports |
+| `a[i:j, k:l]` | `slice2d(a, i, j, k, l)` free-function call | (active) | still required while [#4523](https://github.com/esbmc/esbmc/issues/4523) is open — `__getitem__` assertion crash from #4514 retired by [PR #4522](https://github.com/esbmc/esbmc/pull/4522), but slice-arg propagation into user `__getitem__` is the next layer of the same code path and still unmodelled |
+| `@nki.jit` decorator | stripped at port time | (not an ESBMC issue) | `nki.jit` is just an unmodelled NKI symbol; decorators work fine end-to-end |
+
+So a kernel landed in the repo a few iterations ago looks substantially
+different from the same kernel now: the same control flow, the same
+index arithmetic, but the Python-level surface has converged on the
+upstream NKI form. Two source rewrites remain active (`slice2d`, plus
+the `nl_affine_range = range` rebind as scaffolding); both retire when
+their issues close.
 
 ## Stub-correctness incidents (AUDIT.md)
 

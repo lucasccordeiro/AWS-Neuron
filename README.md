@@ -156,42 +156,31 @@ form the spine; adding more primitives is mechanical.
 
 ## Source-rewriting convention
 
-The NKI kernels use Python features ESBMC's Python frontend does not yet
-parse: tuple unpacking on shape attributes (`M, N = a.shape`), the
-`@nki.jit` decorator, and tile slicing via `a[i:j, k:l]` syntax. Each
-kernel here is the original NKI source rewritten through three uniform
-local transformations:
+Each kernel is a near-verbatim port of the upstream NKI source under
+three local conventions:
 
-- `for x in nl.affine_range(n)` — kept verbatim; the kernel files now
-  use native `for`-loop iteration. Originally a `while x < n: ...; x += 1`
-  rewrite (esbmc/esbmc#4516, iterating an alias/wrapper of `range` failed),
-  retired after [PR #4521](https://github.com/esbmc/esbmc/pull/4521).
-  Each kernel still carries a one-line `nl_affine_range = range` rebind
-  even though esbmc/esbmc#4525 (cross-module name resolution) is now
-  closed by [PR #4529](https://github.com/esbmc/esbmc/pull/4529): the
-  cross-module-propagated alias resolves correctly but loses the
-  iteration-count information that an in-file rewrite preserves, so
-  the loop unwinds unboundedly without the local rebind
-  ([esbmc/esbmc#4533](https://github.com/esbmc/esbmc/issues/4533)).
-- `a[i:j, k:l]` → `slice2d(a, i, j, k, l)`
-  (originally [esbmc/esbmc#4514](https://github.com/esbmc/esbmc/issues/4514),
-  the `__getitem__` assertion crash — resolved by
-  [PR #4522](https://github.com/esbmc/esbmc/pull/4522); the rewrite stays
-  in place because [esbmc/esbmc#4523](https://github.com/esbmc/esbmc/issues/4523)
-  — slice expressions in subscripts and the `slice()` builtin not modelled
-  — is the next layer of the same code path and is still open)
-- shape destructuring `M, N = a.shape` — kept verbatim across all kernels
-  after [PR #4524](https://github.com/esbmc/esbmc/pull/4524) closed
-  esbmc/esbmc#4515 (tuple unpack from a `tuple`-typed attribute) and
-  [PR #4534](https://github.com/esbmc/esbmc/pull/4534) closed
-  esbmc/esbmc#4532 (destructured tuple-attr variable used in
-  arithmetic if-condition inside a for-loop body). Stub library
-  exposes `Tile.shape`, `Tile3D.shape`, `Tile4D.shape` as tuple
-  attributes.
+1. **Stub names instead of NKI imports.** `nl.affine_range` →
+   `nl_affine_range`, `nisa.dma_copy` → `nisa_dma_copy`, etc. The NKI
+   package itself is not modelled; `stubs.py` exposes one Python
+   identifier per NKI primitive.
+2. **`@nki.jit` decorator stripped.** Trivial — `nki.jit` is an
+   unmodelled symbol, not an ESBMC limitation.
+3. **Tile slicing `a[i:j, k:l]` → `slice2d(a, i, j, k, l)`.** The only
+   active *source* rewrite. Stays in place while
+   [esbmc/esbmc#4523](https://github.com/esbmc/esbmc/issues/4523)
+   (slice expressions on user `__getitem__`) is open.
 
-These rewrites preserve control flow and index arithmetic verbatim and are
-the natural target for an `ast`-based pre-pass in a scaled-up version. If
-the three upstream issues land, each rewrite retires.
+Each kernel that iterates also carries a one-line
+`nl_affine_range = range` rebind directly under `from stubs import *`
+to give the loop a same-file alias with iteration-count metadata
+([esbmc/esbmc#4533](https://github.com/esbmc/esbmc/issues/4533)).
+
+For-loops are native (`for m in nl_affine_range(N):`); tuple
+destructuring is native (`M, N = a.shape`); index arithmetic and
+control flow are byte-for-byte against the upstream sources.
+
+The history of which rewrites existed earlier and how each retired is
+in `RETROSPECTIVE.md`.
 
 ## Contributed kernels: status
 
