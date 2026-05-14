@@ -148,6 +148,11 @@ def nl_load_2d(src: Tile, r0: int, r1: int, c0: int, c1: int) -> Tile:
     return Tile(r1 - r0, c1 - c0, src.dtype, BUF_SBUF)
 
 # nl.store(tensor[r0:r1, c0:c1], value=tile) — SBUF -> HBM, slice + shape check.
+# Dtype shape-only per AUDIT Findings 9/10/12 — every shape-only ISA copy/
+# store primitive accepts cross-dtype moves and the engine handles the cast.
+# attn_fwd_v3's final `nl.store(kernel_out[row_strip], attn_out_fp32)` writes
+# a fp32 SBUF tile into a fp16 HBM output; same pattern as nisa.dma_copy,
+# nisa.tensor_copy, nisa.tensor_tensor, and nl_store_2d_full.
 def nl_store_2d(dst: Tile, r0: int, r1: int, c0: int, c1: int,
                 value: Tile) -> None:
     assert 0 <= r0
@@ -158,7 +163,6 @@ def nl_store_2d(dst: Tile, r0: int, r1: int, c0: int, c1: int,
     assert c1 <= dst.d1
     assert (r1 - r0) == value.d0
     assert (c1 - c0) == value.d1
-    assert dst.dtype == value.dtype
 
 # ============================================================== 3-D indexing
 
@@ -755,6 +759,48 @@ def nisa_nc_transpose(dst: Tile, data: Tile) -> None:
     assert dst.d0 == data.d1
     assert dst.d1 == data.d0
     assert dst.buffer == BUF_PSUM
+
+# t[k0, k1, :, :] — drop the first two scalar indices of a 4-D tile.
+# Returns a 2-D view of shape (t.d2, t.d3). Used by v3-style attention
+# where qk is held as a 4-D (q_tiles, kv_tiles, PMAX, FMAX_MOVING) HBM
+# tensor and the per-(i, j) slot is read or written as a 2-D tile.
+def slice_4d_drop_d0_d1(t: Tile4D, k0: int, k1: int) -> Tile:
+    assert 0 <= k0
+    assert k0 < t.d0
+    assert 0 <= k1
+    assert k1 < t.d1
+    return Tile(t.d2, t.d3, t.dtype, t.buffer)
+
+# nl.load(src[k]) — load the k-th 2-D slab of a 3-D HBM tile into SBUF.
+# Combines slab_get + nisa.dma_copy into one call, matching the upstream
+# `nl.load(t[k])` idiom.
+def nl_load_3d_slot(src: Tile3D, k: int) -> Tile:
+    assert 0 <= k
+    assert k < src.d0
+    return Tile(src.d1, src.d2, src.dtype, BUF_SBUF)
+
+# nl.store(dst[k], value) — write a 2-D SBUF tile into the k-th slab of
+# a 3-D HBM tile. Shape match (and partition-dim discipline) preserved.
+def nl_store_3d_slot(dst: Tile3D, k: int, value: Tile) -> None:
+    assert 0 <= k
+    assert k < dst.d0
+    assert value.d0 == dst.d1
+    assert value.d1 == dst.d2
+
+# nl.load(src[i, r0:r1, c0:c1]) — load a 3-D slice into SBUF. The scalar
+# axis is dropped; the range axes become the result's (d0, d1). Combines
+# slice_3d_at + nisa.dma_copy.
+def nl_load_3d_at(src: Tile3D, i: int, r0: int, r1: int,
+                  c0: int, c1: int) -> Tile:
+    assert 0 <= i
+    assert i < src.d0
+    assert 0 <= r0
+    assert r0 <= r1
+    assert r1 <= src.d1
+    assert 0 <= c0
+    assert c0 <= c1
+    assert c1 <= src.d2
+    return Tile(r1 - r0, c1 - c0, src.dtype, BUF_SBUF)
 
 # ============================================================== 5-D views (.ap)
 

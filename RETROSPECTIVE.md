@@ -6,8 +6,8 @@ assumes familiarity with the verifier but not with NKI.
 
 ## TL;DR
 
-- **17 NKI kernel functions ported** (across 10 upstream source files —
-  6 tutorials, 4 community-`contributed/` kernels), 41 build targets
+- **18 NKI kernel functions ported** (across 10 upstream source files —
+  6 tutorials, 4 community-`contributed/` kernels), 43 build targets
   (concrete + positive-control + 5 symbolic-shape variants + 1
   historical-bug reproduction), 100 % pass rate against expected
   verdicts; full regression in about 4 minutes wall-clock on Bitwuzla.
@@ -59,6 +59,7 @@ filed ESBMC issue (#4514–#4516).
 | `tutorials/average_pool2d/average_pool2d_nki_kernels.py` | tutorials | good + buggy (introduces `Tile5D`, `tile3d_ap_5d`) |
 | `tutorials/attention_fwd_performance/attention_kernels.py::attn_fwd_v1` | tutorials | good + buggy (introduces `nl_matmul` with transpose flags, `nl_transpose_2d`, softmax-chain reductions, `nisa_tensor_scalar_broadcast`; surfaced AUDIT Finding 12 on `nl_matmul` dtype contract) |
 | `tutorials/attention_fwd_performance/attention_kernels.py::attn_fwd_v2` + `attention_kernel_utils.py::softmax_isa` | tutorials | good + buggy (ISA-level attention: `nisa_nc_matmul`, `nisa_nc_transpose`, `nisa_tensor_reduce_2d_axis1`, `nisa_reciprocal_2d`, `nisa_activation_no_scale`; reusable `softmax_isa` helper for v3 / pipelined_attention; surfaced AUDIT Finding 12 sweep across `ni_nc_matmul` / `nisa_nc_matmul` and Finding 13 on stationary/moving operand-swap blind spot) |
+| `tutorials/attention_fwd_performance/attention_kernels.py::attn_fwd_v3` | tutorials | good + buggy (large-sequence asymmetric blocked layout, 4-D `qk` tile, streaming softmax through 3-D HBM tiles; introduces `slice_4d_drop_d0_d1`, `nl_load_3d_slot` / `nl_store_3d_slot`, `nl_load_3d_at`; extended Finding 12 sweep to `nl_store_2d`; **closes AUDIT-13 operand-swap blind spot** — the buggy variant injects exactly that swap and is correctly rejected by `a.d1 <= GEMM_STATIONARY_FMAX`) |
 | `contributed/matmul.py` | community | good (two sizes) + buggy |
 | `contributed/maxpooling.py` | community | good + buggy + symbolic-shape |
 | `contributed/interpolate_bilinear_fwd.py` | community | good + buggy + symbolic-shape |
@@ -92,6 +93,10 @@ Catalogued at a glance to show breadth:
   `nisa_activation_no_scale`; reusable `softmax_isa` helper composes
   these into the standard subtract-max / exp / sum / reciprocal /
   multiply softmax pipeline
+- **4-D tile views and 3-D HBM streaming** (v3): `slice_4d_drop_d0_d1`
+  (scalar+scalar+:+: view), `nl_load_3d_slot` / `nl_store_3d_slot`
+  (combined alloc+dma for slot-indexed 3-D HBM access),
+  `nl_load_3d_at` (scalar+ranges 3-D load)
 - **Matmul**: `ni_nc_matmul` (returning form), `nisa_nc_matmul`
   (explicit-destination form) — with par-dim ≤ PMAX and GEMM-FMAX limits
 - **Accumulation / reduction**: `iadd` (PSUM), `nl_loop_reduce`,
