@@ -244,3 +244,59 @@ mismatch).
 a sweep across primitives of the same shape (shape-only ISA copies in
 this case). Updating one stub and not the cousins leaves the same
 incident waiting to happen at the next port.
+
+---
+
+## Finding 11 — `tile3d_ap_5d` partition-axis alignment is not enforced
+
+Surfaced during the Tier-2 average_pool2d port code review.
+
+The `.ap()` constant-stride view stub `tile3d_ap_5d(src, s0, c0, ..., s4, c4)`
+asserts an in-bounds linear-offset envelope:
+
+```python
+max_offset = s0*(c0-1) + s1*(c1-1) + s2*(c2-1) + s3*(c3-1) + s4*(c4-1)
+assert max_offset < src.d0 * src.d1 * src.d2
+```
+
+plus a per-axis partition-dim limit `c0 <= PMAX` when the source lives
+in SBUF or PSUM. The contract is sufficient to prove that every
+element accessed via the view stays inside the source's flat allocation,
+which is what shape-and-bounds verification requires.
+
+**Soundness gap**: NeuronCore's physical SBUF/PSUM partition axis is
+not a permutation of the source's flat allocation. The .ap() view's
+first axis must *align* with the source's partition axis on real
+hardware; otherwise the view crosses partition boundaries and is
+hardware-invalid even though every accessed element is inside the
+allocation. The current contract does not enforce this alignment.
+
+Concretely, a kernel could declare `s0 = 1, c0 = PMAX` on a Tile3D
+with `src.d0 = 1, src.d1 = 4, src.d2 = 32` (SBUF, total volume 128)
+and our contract would accept it — yet on hardware this would read
+across the partition axis in a way the NKI runtime would reject.
+
+**Status**: documented limitation; not patched. Tightening would
+require resolving an existing inconsistency in Tile3D conventions —
+the matmul-slab kernels treat `d1` as par_dim (encoded in
+`nl_ndarray_3d`'s SBUF assertion `d1 <= PMAX`), while the avgpool
+and mamba 3-D layouts treat `d0` as par_dim. A consistent
+partition-axis attribute on Tile3D, plus per-stub assertions that
+.ap() axis 0 strides whole partition-major slabs, is the principled
+fix — and it is a larger modelling exercise than this PoC has
+absorbed.
+
+**Practical impact on this PoC**: every ported kernel's `.ap()`
+call uses physically meaningful strides (the upstream NKI tutorials
+are written by Annapurna engineers and respect the partition-axis
+discipline). The contract catches all the stride/count off-by-ones
+a shape-and-bounds checker is expected to catch, including the
+positive-control `avgpool_buggy` (`max_offset = 73 > 72`). The gap
+matters when reasoning about *adversarial* kernels, not the published
+samples.
+
+**Lesson**: shape-and-bounds verification has a physical-residency
+blind spot. The PoC's value proposition ("if it verifies, the shape
+math is correct") holds; the stronger claim ("if it verifies, the
+kernel runs on hardware") needs the partition-axis discipline
+modelled explicitly.

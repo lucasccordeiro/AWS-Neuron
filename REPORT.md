@@ -101,8 +101,8 @@ for one, conditionally for the other":
   as the ground truth, ESBMC's bounded model checking is sound up to
   the unwinding bound: every path of length ≤ the bound is explored.
   Five of our targets are explicitly symbolic and use `--unwind` to
-  bound the family they sweep; the other 17 use concrete shapes and
-  finite loops where unwinding is exhaustive. The verifier never says
+  bound the family they sweep; the rest use concrete shapes and finite
+  loops where unwinding is exhaustive. The verifier never says
   `SUCCESSFUL` on a path it has not in fact explored.
 
 - **Model soundness (do the stub contracts correctly model NKI?).**
@@ -132,18 +132,21 @@ specification artefacts or a co-design exercise with the NKI team.
 
 ## Stub-library scope
 
-`harness/stubs.py` (~620 LoC) provides shape-and-dtype models for:
+`harness/stubs.py` (~715 LoC) provides shape-and-dtype models for:
 
 ```
-Tile, Tile3D, Tile4D                # 2-D, 3-D, 4-D tiles (d0..d3, dtype, buffer)
+Tile, Tile3D, Tile4D, Tile5D        # 2/3/4/5-D tiles (d0..d4, dtype, buffer)
 IndexTensor                         # value-range model for mgrid-style indices
-nl_ndarray_2d / _3d / _4d           # allocation; partition-dim limit on SBUF/PSUM
+nl_ndarray_2d / _3d / _4d / _5d     # allocation; partition-dim limit on SBUF/PSUM
 nl_zeros_2d / _3d / _4d             # zero-initialised allocation
 slice2d, slice_cols                 # view-style slicing
 nl_load_2d, nl_store_2d             # HBM <-> SBUF with implicit slicing
 slab_get / set / cols_get / set     # 3-D indexing for matmul-style layouts
-nisa_dma_copy, _tensor_tensor,      # ISA-level ops with shape + dtype checks
-   _tensor_copy
+nisa_dma_copy, _dma_copy_3d,        # ISA-level ops with shape + dtype checks
+   _tensor_tensor, _tensor_copy
+nisa_tensor_scalar_3d               # scalar-broadcast op on 3-D tiles
+tile3d_ap_5d                        # `.ap()` constant-stride 5-D view of a 3-D tile
+nl_sum_5d_axes34_to_3d              # nl.sum(view, axis=[3, 4]) on a 5-D view
 ni_nc_matmul, nisa_nc_matmul        # nc_matmul (returning + explicit-destination)
 nisa_activation                     # elementwise unary (e.g. nl.exp) with scale
 nisa_tensor_tensor_scan             # associative scan (shape-passthrough)
@@ -163,12 +166,20 @@ nl_max_fancy_3d_to_2d               # masked fancy max reduction
 tile_fancy_access_3d, _4d           # bound-check on fancy access (read/write)
 ```
 
+The `.ap()` view is modelled as constant-stride: each axis carries a
+`(stride, count)` pair, and the maximum reachable flat offset
+`Σ stride_k · (count_k − 1)` must be strictly less than the source's
+element count. This catches stride/count off-by-ones and total-volume
+overflow but is silent on transpositions that happen to preserve total
+volume — a deliberate weakening (recorded in `tile3d_ap_5d`'s comment),
+sound for shape-and-bounds verification.
+
 The full NKI runtime needs more such stubs to cover the rest of the
-`nki-samples` corpus — additional reductions (`nl.sum`),
-`nisa.tensor_scalar`, access patterns (`.ap()`), broadcast-style
-indexers (`nl.ds`, `par_dim`), and decorators (`@nki.jit`,
-`@nki.baremetal`). The shapes here form the spine; adding more
-primitives is mechanical.
+`nki-samples` corpus — additional reductions on arbitrary axes,
+broadcast-style indexers (`nl.ds`, `par_dim`), the softmax chain
+(`nl.exp` / `nl.max(axis=)` / `nl.reciprocal`), and decorators
+(`@nki.jit`, `@nki.baremetal`). The shapes here form the spine; adding
+more primitives is mechanical.
 
 ## Source-rewriting convention
 
@@ -239,6 +250,10 @@ Tutorials covered:
   delta/u loads out of the state loop), `mamba_v3` (adds an inner
   seq-tile loop with column-strip slicing into existing SBUF tiles
   and a `scan_init` accumulator carried across seq tiles).
+- `tutorials/average_pool2d` — `tensor_avgpool_kernel`, introducing
+  the `.ap()` access-pattern view (`Tile5D`, `tile3d_ap_5d`) plus
+  `nl.sum(view, axis=[3, 4])`, `nisa.tensor_scalar`, and 3-D
+  `nisa.dma_copy`.
 
 Deferred:
 
@@ -246,8 +261,7 @@ Deferred:
   primitives (`ni.nc_matmul` with non-trivial accumulator routing,
   softmax, scaled-dot-product structure) that go beyond the current
   shape-and-bounds story.
-- `tutorials/{average_pool2d, mxfp-matmul, attention_fwd_performance}` —
-  not attempted.
+- `tutorials/{mxfp-matmul, attention_fwd_performance}` — not attempted.
 
 ## What still does not work
 
@@ -277,7 +291,7 @@ of bugs caught here — wrong slice arithmetic, mismatched tile shapes
 between operands, partition-dim limit violations, hardware-shape
 violations on the matmul unit — are exactly the high-volume failure
 modes a static checker can address up front. The PoC shows that the
-engineering surface is small (a single ~640-line stub library covers
-thirteen kernel families across four tutorials and four contributed
-kernels) and that the verifier is fast (the full 34-target suite
+engineering surface is small (a single ~715-line stub library covers
+fifteen NKI kernel functions across five tutorials and four contributed
+kernels) and that the verifier is fast (the full 37-target suite
 finishes in about four minutes).

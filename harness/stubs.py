@@ -41,6 +41,21 @@ class Tile4D:
         self.dtype: int = dtype
         self.buffer: int = buffer
 
+class Tile5D:
+    """Rank-5 tile: shape (d0, d1, d2, d3, d4). Produced by tile3d_ap_5d
+    (`.ap()` access-pattern view) and reduced back to 2-D/3-D shapes by
+    the `nl.sum(..., axis=[...])` stubs."""
+    def __init__(self, d0: int, d1: int, d2: int, d3: int, d4: int,
+                 dtype: int, buffer: int):
+        self.d0: int = d0
+        self.d1: int = d1
+        self.d2: int = d2
+        self.d3: int = d3
+        self.d4: int = d4
+        self.shape: tuple = (d0, d1, d2, d3, d4)
+        self.dtype: int = dtype
+        self.buffer: int = buffer
+
 # ============================================================== Buffer tags
 
 BUF_HBM: int        = 1
@@ -191,6 +206,13 @@ def slab_cols_set(t: Tile3D, k: int, c0: int, c1: int, value: Tile) -> None:
 def nisa_dma_copy(dst: Tile, src: Tile) -> None:
     assert dst.d0 == src.d0
     assert dst.d1 == src.d1
+
+# 3-D variant of nisa.dma_copy, used by avgpool which DMA-copies whole
+# (C, H, W) tiles in a single call. Same shape-only contract.
+def nisa_dma_copy_3d(dst: Tile3D, src: Tile3D) -> None:
+    assert dst.d0 == src.d0
+    assert dst.d1 == src.d1
+    assert dst.d2 == src.d2
 
 # nisa.tensor_tensor(dst, a, b, op): ternary shape equality. Dtypes need
 # not all match — NKI permits mixed-precision accumulation (e.g. adding
@@ -627,3 +649,66 @@ def nl_max_fancy_3d_to_2d(in_tile: Tile3D,
     assert out_d1 > 0
     assert out_d0 <= PMAX
     return Tile(out_d0, out_d1, dtype, in_tile.buffer)
+
+# ============================================================== 5-D views (.ap)
+
+# Allocation for 5-D tiles. d0 is the partition axis.
+def nl_ndarray_5d(d0: int, d1: int, d2: int, d3: int, d4: int,
+                  dtype: int, buffer: int) -> Tile5D:
+    assert d0 > 0
+    assert d1 > 0
+    assert d2 > 0
+    assert d3 > 0
+    assert d4 > 0
+    if buffer == BUF_SBUF or buffer == BUF_PSUM:
+        assert d0 <= PMAX
+    return Tile5D(d0, d1, d2, d3, d4, dtype, buffer)
+
+# tile3d.ap([[s0,c0], [s1,c1], [s2,c2], [s3,c3], [s4,c4]])
+# Constant-stride access-pattern view producing a 5-D view of a 3-D tile.
+# Each axis is described by a (stride, count) pair: axis k addresses
+# `count_k` elements starting at flat offset 0, stepping by `stride_k`.
+# Maximum flat offset reached is sum_k(stride_k * (count_k - 1)) and
+# must be strictly less than the source's flat-element count
+# (src.d0 * src.d1 * src.d2). The view's first axis is the partition
+# axis when the source lives in SBUF/PSUM, so c0 ≤ PMAX is also required.
+#
+# This contract is shape-and-bounds: it does not check that the strides
+# correspond to any meaningful reshape; it only proves that every
+# element reachable through the view is inside the source's allocation.
+def tile3d_ap_5d(src: Tile3D,
+                 s0: int, c0: int,
+                 s1: int, c1: int,
+                 s2: int, c2: int,
+                 s3: int, c3: int,
+                 s4: int, c4: int) -> Tile5D:
+    assert c0 > 0
+    assert c1 > 0
+    assert c2 > 0
+    assert c3 > 0
+    assert c4 > 0
+    assert s0 >= 0
+    assert s1 >= 0
+    assert s2 >= 0
+    assert s3 >= 0
+    assert s4 >= 0
+    max_offset: int = (s0 * (c0 - 1) + s1 * (c1 - 1) + s2 * (c2 - 1)
+                       + s3 * (c3 - 1) + s4 * (c4 - 1))
+    assert max_offset < src.d0 * src.d1 * src.d2
+    if src.buffer == BUF_SBUF or src.buffer == BUF_PSUM:
+        assert c0 <= PMAX
+    return Tile5D(c0, c1, c2, c3, c4, src.dtype, src.buffer)
+
+# nl.sum(tile5d, axis=[3, 4]) — sum-reduce the last two axes of a 5-D
+# view, producing a 3-D tile with the leading three axes preserved.
+def nl_sum_5d_axes34_to_3d(t: Tile5D, dtype: int) -> Tile3D:
+    return Tile3D(t.d0, t.d1, t.d2, dtype, t.buffer)
+
+# nisa.tensor_scalar(dst, data, op, operand) on 3-D tiles — shape
+# passthrough. The scalar operand does not enter the shape contract;
+# the dtype is taken from `dst`'s allocation (cross-dtype scalar ops
+# are permitted on NeuronCore, like nisa.tensor_tensor and friends).
+def nisa_tensor_scalar_3d(dst: Tile3D, data: Tile3D) -> None:
+    assert dst.d0 == data.d0
+    assert dst.d1 == data.d1
+    assert dst.d2 == data.d2
