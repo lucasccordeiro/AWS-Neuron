@@ -7,10 +7,8 @@
 from stubs import *
 
 def nki_matmul_basic(lhsT: Tile, rhs: Tile) -> Tile:
-    K: int  = lhsT.d0
-    M: int  = lhsT.d1
-    K2: int = rhs.d0
-    N: int  = rhs.d1
+    K, M  = lhsT.shape
+    K2, N = rhs.shape
 
     assert K == K2
     assert K == 128

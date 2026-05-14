@@ -10,8 +10,7 @@ from stubs import *
 nl_affine_range = range  # in-file rebind so the same-module range-alias pre-pass (esbmc/esbmc#4521) fires
 
 def max_pooling_2d_stride_1(in_tensor: Tile, k: int) -> Tile:
-    h_in: int = in_tensor.d0
-    w_in: int = in_tensor.d1
+    h_in, w_in = in_tensor.shape
     h_out: int = h_in - (k - 1)
     w_out: int = w_in - (k - 1)
 

@@ -11,9 +11,8 @@ def matmul_kernel(A_DRAM: Tile, B_DRAM: Tile,
                   TILES_IN_BLOCK_K: int,
                   TILES_IN_BLOCK_M: int,
                   TILES_IN_BLOCK_N: int) -> Tile:
-    K: int = A_DRAM.d0
-    M: int = A_DRAM.d1
-    N: int = B_DRAM.d1
+    K, M = A_DRAM.shape
+    _, N = B_DRAM.shape
 
     Z_DRAM: Tile = nl_ndarray_2d(M, N, A_DRAM.dtype, BUF_SHARED_HBM)
 

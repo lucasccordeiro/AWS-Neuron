@@ -9,10 +9,10 @@ from stubs import *
 nl_affine_range = range  # in-file rebind so the same-module range-alias pre-pass (esbmc/esbmc#4521) fires
 
 def tensor_transpose2D_kernel(in_tensor: Tile, sz_f1: int, sz_f2: int) -> Tile:
+    sz_p, _ = in_tensor.shape
+
     out_tensor: Tile = nl_ndarray_2d(in_tensor.d0, in_tensor.d1,
                                      in_tensor.dtype, BUF_SHARED_HBM)
-
-    sz_p: int = in_tensor.d0
 
     in_tile: Tile = nl_ndarray_2d(in_tensor.d0, in_tensor.d1,
                                   in_tensor.dtype, BUF_SBUF)

@@ -12,6 +12,9 @@ from stubs import *
 nl_affine_range = range  # in-file rebind so the same-module range-alias pre-pass (esbmc/esbmc#4521) fires
 
 def interpolate_trilinear_2x_fwd(src_arr: Tile4D, chunk_size: int) -> Tile4D:
+    # NOTE: per-axis assignment instead of `nc, d_src, h_src, w_src = src_arr.shape`
+    # because esbmc/esbmc#4532 (destructured tuple-attr variable used in
+    # arithmetic if-condition inside a for-loop body) is still open.
     nc: int    = src_arr.d0
     d_src: int = src_arr.d1
     h_src: int = src_arr.d2
@@ -34,7 +37,7 @@ def interpolate_trilinear_2x_fwd(src_arr: Tile4D, chunk_size: int) -> Tile4D:
 
     for d in nl_affine_range(d_tiles_count):
         d_start_hbm_src: int = d * step_size
-        d_end_hbm_src: int
+        d_end_hbm_src: int = 0
         if wdw_size + d * step_size < d_src:
             d_end_hbm_src = wdw_size + d * step_size
         else:
@@ -240,8 +243,8 @@ def interpolate_trilinear_2x_fwd(src_arr: Tile4D, chunk_size: int) -> Tile4D:
             tile_fancy_access_4d(out_tile, i_pco, i_d_dst_co, i_h_dst_co, i_w_dst_co)
 
             # ---- Store to HBM
-            d_start_tile_dst: int
-            d_start_hbm_dst:  int
+            d_start_tile_dst: int = 0
+            d_start_hbm_dst:  int = 0
             if d_start_hbm_src > 0:
                 d_start_tile_dst = 1
                 d_start_hbm_dst  = 2 * d_start_hbm_src + 1

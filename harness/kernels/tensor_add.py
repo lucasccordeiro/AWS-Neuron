@@ -13,16 +13,13 @@ from stubs import *
 nl_affine_range = range  # in-file rebind so the same-module range-alias pre-pass (esbmc/esbmc#4521) fires
 
 def nki_tensor_add(a_input: Tile, b_input: Tile) -> Tile:
-    c_output: Tile = nl_ndarray_2d(a_input.d0, a_input.d1,
-                                   a_input.dtype, BUF_SHARED_HBM)
+    M, N = a_input.shape
+    c_output: Tile = nl_ndarray_2d(M, N, a_input.dtype, BUF_SHARED_HBM)
 
-    M: int = a_input.d0
-    N: int = a_input.d1
     TILE_M: int = 128
     TILE_N: int = 512
 
-    assert a_input.d0 == b_input.d0
-    assert a_input.d1 == b_input.d1
+    assert a_input.shape == b_input.shape
     assert a_input.dtype == b_input.dtype
     assert M % TILE_M == 0
     assert N % TILE_N == 0

@@ -10,14 +10,12 @@ from stubs import *
 nl_affine_range = range  # in-file rebind so the same-module range-alias pre-pass (esbmc/esbmc#4521) fires
 
 def mamba_v1(delta: Tile3D, u: Tile3D, A: Tile, B: Tile3D, C: Tile3D) -> Tile3D:
-    batch_size: int = delta.d0
-    channels:   int = delta.d1
-    seq_len:    int = delta.d2
+    batch_size, channels, seq_len = delta.shape
 
     output: Tile3D = nl_ndarray_3d(batch_size, channels, seq_len,
                                    delta.dtype, BUF_SHARED_HBM)
 
-    state_size: int = A.d1
+    _, state_size = A.shape
     assert A.d0 == channels
     assert channels % PMAX == 0
 

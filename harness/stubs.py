@@ -16,6 +16,7 @@ class Tile:
     def __init__(self, d0: int, d1: int, dtype: int, buffer: int):
         self.d0: int = d0
         self.d1: int = d1
+        self.shape: tuple = (d0, d1)
         self.dtype: int = dtype
         self.buffer: int = buffer
 
@@ -25,6 +26,7 @@ class Tile3D:
         self.d0: int = d0
         self.d1: int = d1
         self.d2: int = d2
+        self.shape: tuple = (d0, d1, d2)
         self.dtype: int = dtype
         self.buffer: int = buffer
 
@@ -35,6 +37,7 @@ class Tile4D:
         self.d1: int = d1
         self.d2: int = d2
         self.d3: int = d3
+        self.shape: tuple = (d0, d1, d2, d3)
         self.dtype: int = dtype
         self.buffer: int = buffer
 
