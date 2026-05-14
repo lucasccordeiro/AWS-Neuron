@@ -8,6 +8,7 @@
 # nl_max_fancy_3d_to_2d (see stubs.py).
 
 from stubs import *
+nl_affine_range = range  # in-file rebind so the same-module range-alias pre-pass (esbmc/esbmc#4521) fires
 
 def max_pooling_2d_stride_1(in_tensor: Tile, k: int) -> Tile:
     h_in: int = in_tensor.d0
@@ -25,8 +26,7 @@ def max_pooling_2d_stride_1(in_tensor: Tile, k: int) -> Tile:
     # math.ceil(h_in / PMAX) without floats.
     h_tiles_count: int = (h_in + PMAX - 1) // PMAX
 
-    h_tile_idx: int = 0
-    while h_tile_idx < h_tiles_count:
+    for h_tile_idx in nl_affine_range(h_tiles_count):
         # mgrid for the load: (PMAX, k, w_in)
         # axis0 (par_dim) = i_h, axis1 = i_kh, axis2 = i_w
         i_h: IndexTensor   = mgrid_axis(0, PMAX)
@@ -76,6 +76,5 @@ def max_pooling_2d_stride_1(in_tensor: Tile, k: int) -> Tile:
             out_tile,                     # value
         )
 
-        h_tile_idx = h_tile_idx + 1
 
     return out_tensor

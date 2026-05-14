@@ -9,6 +9,7 @@
 #   - the final reshape((n, c, d_dst, h_dst, w_dst)) is omitted
 
 from stubs import *
+nl_affine_range = range  # in-file rebind so the same-module range-alias pre-pass (esbmc/esbmc#4521) fires
 
 def interpolate_trilinear_2x_fwd(src_arr: Tile4D, chunk_size: int) -> Tile4D:
     nc: int    = src_arr.d0
@@ -31,8 +32,7 @@ def interpolate_trilinear_2x_fwd(src_arr: Tile4D, chunk_size: int) -> Tile4D:
 
     d_tiles_count: int = ((d_src - wdw_size) + step_size - 1) // step_size + 1
 
-    d: int = 0
-    while d < d_tiles_count:
+    for d in nl_affine_range(d_tiles_count):
         d_start_hbm_src: int = d * step_size
         d_end_hbm_src: int
         if wdw_size + d * step_size < d_src:
@@ -46,8 +46,7 @@ def interpolate_trilinear_2x_fwd(src_arr: Tile4D, chunk_size: int) -> Tile4D:
 
         p_tiles_count: int = (nc + PMAX - 1) // PMAX
 
-        p: int = 0
-        while p < p_tiles_count:
+        for p in nl_affine_range(p_tiles_count):
             out_tile: Tile4D = nl_ndarray_4d(PMAX, d_tile_size_dst, h_dst, w_dst,
                                              src_arr.dtype, BUF_SBUF)
 
@@ -260,7 +259,5 @@ def interpolate_trilinear_2x_fwd(src_arr: Tile4D, chunk_size: int) -> Tile4D:
             tile_fancy_access_4d(out_tile, i_p_st, i_d_st, i_h_st, i_w_st)
             nl_store_fancy_4d(dst_arr, i_p_hbm, i_d_hbm, i_h_st, i_w_st, nc, out_tile)
 
-            p = p + 1
-        d = d + 1
 
     return dst_arr

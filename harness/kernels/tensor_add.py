@@ -10,6 +10,7 @@
 # come from stubs.py via `from stubs import *`.
 
 from stubs import *
+nl_affine_range = range  # in-file rebind so the same-module range-alias pre-pass (esbmc/esbmc#4521) fires
 
 def nki_tensor_add(a_input: Tile, b_input: Tile) -> Tile:
     c_output: Tile = nl_ndarray_2d(a_input.d0, a_input.d1,
@@ -26,10 +27,8 @@ def nki_tensor_add(a_input: Tile, b_input: Tile) -> Tile:
     assert M % TILE_M == 0
     assert N % TILE_N == 0
 
-    m: int = 0
-    while m < M // TILE_M:
-        n: int = 0
-        while n < N // TILE_N:
+    for m in nl_affine_range(M // TILE_M):
+        for n in nl_affine_range(N // TILE_N):
             a_tile: Tile = nl_ndarray_2d(TILE_M, TILE_N, a_input.dtype, BUF_SBUF)
             b_tile: Tile = nl_ndarray_2d(TILE_M, TILE_N, b_input.dtype, BUF_SBUF)
 
@@ -46,7 +45,5 @@ def nki_tensor_add(a_input: Tile, b_input: Tile) -> Tile:
             nisa_dma_copy(slice2d(c_output, m*TILE_M, (m+1)*TILE_M,
                                             n*TILE_N, (n+1)*TILE_N),
                           c_tile)
-            n = n + 1
-        m = m + 1
 
     return c_output

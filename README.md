@@ -162,9 +162,13 @@ parse: tuple unpacking on shape attributes (`M, N = a.shape`), the
 kernel here is the original NKI source rewritten through three uniform
 local transformations:
 
-- `for x in nl.affine_range(n)` → `while x < n: ...; x += 1`
-  ([esbmc/esbmc#4516](https://github.com/esbmc/esbmc/issues/4516):
-  iterating an alias or wrapper of `range` does not parse)
+- `for x in nl.affine_range(n)` — kept verbatim; the kernel files now
+  use native `for`-loop iteration. Originally a `while x < n: ...; x += 1`
+  rewrite (esbmc/esbmc#4516, iterating an alias/wrapper of `range` failed),
+  retired after [PR #4521](https://github.com/esbmc/esbmc/pull/4521).
+  Each kernel still carries a one-line `nl_affine_range = range` rebind
+  because the same-file pre-pass does not yet propagate across module
+  imports ([esbmc/esbmc#4525](https://github.com/esbmc/esbmc/issues/4525)).
 - `a[i:j, k:l]` → `slice2d(a, i, j, k, l)`
   (originally [esbmc/esbmc#4514](https://github.com/esbmc/esbmc/issues/4514),
   the `__getitem__` assertion crash — resolved by

@@ -2,6 +2,7 @@
 #   https://github.com/aws-neuron/nki-samples/blob/a87aaa44f7b26241bdb152af8838e287669c3947/src/nki_samples/tutorials/transpose2d/transpose2d_nki_kernels.py
 
 from stubs import *
+nl_affine_range = range  # in-file rebind so the same-module range-alias pre-pass (esbmc/esbmc#4521) fires
 
 def tensor_transpose2D_kernel(in_tensor: Tile, sz_f1: int, sz_f2: int) -> Tile:
     out_tensor: Tile = nl_ndarray_2d(in_tensor.d0, in_tensor.d1,
@@ -20,10 +21,8 @@ def tensor_transpose2D_kernel(in_tensor: Tile, sz_f1: int, sz_f2: int) -> Tile:
     assert sz_f2 > 0
     assert in_tensor.d1 == sz_f1 * sz_f2
 
-    i_f1: int = 0
-    while i_f1 < sz_f1:
-        i_f2: int = 0
-        while i_f2 < sz_f2:
+    for i_f1 in nl_affine_range(sz_f1):
+        for i_f2 in nl_affine_range(sz_f2):
             dst_strip: Tile = slice_cols(out_tile,
                                          i_f2 * sz_f1 + i_f1,
                                          i_f2 * sz_f1 + i_f1 + 1)
@@ -31,8 +30,6 @@ def tensor_transpose2D_kernel(in_tensor: Tile, sz_f1: int, sz_f2: int) -> Tile:
                                          i_f1 * sz_f2 + i_f2,
                                          i_f1 * sz_f2 + i_f2 + 1)
             nisa_tensor_copy(dst_strip, src_strip)
-            i_f2 = i_f2 + 1
-        i_f1 = i_f1 + 1
 
     nisa_dma_copy(out_tensor, out_tile)
     return out_tensor

@@ -87,7 +87,8 @@ Catalogued at a glance to show breadth:
 | [#4514](https://github.com/esbmc/esbmc/issues/4514) | **RESOLVED** ([PR #4522](https://github.com/esbmc/esbmc/pull/4522)) | user-defined `__getitem__` → internal assertion in `value_set.cpp` | follow-on [#4523](https://github.com/esbmc/esbmc/issues/4523) still gates retiring `slice2d` |
 | [#4523](https://github.com/esbmc/esbmc/issues/4523) | OPEN | `a[i:j]` colon slices and `slice()` builtin not modelled | keeps the `a[i:j, k:l]` → `slice2d(a, i, j, k, l)` rewrite in place |
 | [#4515](https://github.com/esbmc/esbmc/issues/4515) | OPEN | tuple unpack fails when source is class attribute or `tuple`-typed parameter | `M, N = a.shape` → individual scalar assignments |
-| [#4516](https://github.com/esbmc/esbmc/issues/4516) | OPEN | `for`-loop over an alias of `range` or a function returning `range` fails | `for x in nl.affine_range(n)` → `while x < n: ...; x += 1` |
+| [#4516](https://github.com/esbmc/esbmc/issues/4516) | **RESOLVED** ([PR #4521](https://github.com/esbmc/esbmc/pull/4521)) | `for`-loop over an alias of `range` or a function returning `range` fails | retired the `while`-loop rewrite; native `for` loops back in kernels |
+| [#4525](https://github.com/esbmc/esbmc/issues/4525) | OPEN | range-alias / wrapper rewriter doesn't propagate across module imports | one-line `nl_affine_range = range` rebind per kernel |
 
 The four open issues all have minimal repros in their bodies and would,
 collectively, retire every remaining concession the PoC makes against

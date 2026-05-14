@@ -7,6 +7,7 @@
 # upstream file is correct as published.
 
 from stubs import *
+nl_affine_range = range  # in-file rebind so the same-module range-alias pre-pass (esbmc/esbmc#4521) fires
 
 def max_pooling_2d_stride_1(in_tensor: Tile, k: int) -> Tile:
     h_in: int = in_tensor.d0
@@ -23,8 +24,7 @@ def max_pooling_2d_stride_1(in_tensor: Tile, k: int) -> Tile:
 
     h_tiles_count: int = (h_in + PMAX - 1) // PMAX
 
-    h_tile_idx: int = 0
-    while h_tile_idx < h_tiles_count:
+    for h_tile_idx in nl_affine_range(h_tiles_count):
         i_h: IndexTensor   = mgrid_axis(0, PMAX)
         i_kh: IndexTensor  = mgrid_axis(0, k)
         i_w: IndexTensor   = mgrid_axis(0, w_in)
@@ -64,6 +64,5 @@ def max_pooling_2d_stride_1(in_tensor: Tile, k: int) -> Tile:
             out_tile,
         )
 
-        h_tile_idx = h_tile_idx + 1
 
     return out_tensor

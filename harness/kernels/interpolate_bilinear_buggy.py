@@ -8,6 +8,7 @@
 #   - the final reshape((n, c, h_dst, w_dst)) is omitted; PoC checks 3-D output
 
 from stubs import *
+nl_affine_range = range  # in-file rebind so the same-module range-alias pre-pass (esbmc/esbmc#4521) fires
 
 def interpolate_bilinear_2x_fwd(src_arr: Tile3D, chunk_size: int) -> Tile3D:
     nc: int    = src_arr.d0
@@ -27,8 +28,7 @@ def interpolate_bilinear_2x_fwd(src_arr: Tile3D, chunk_size: int) -> Tile3D:
 
     h_tiles_count: int = ((h_src - wdw_size) + step_size - 1) // step_size + 1
 
-    h: int = 0
-    while h < h_tiles_count:
+    for h in nl_affine_range(h_tiles_count):
         h_start_hbm_src: int = h * step_size
         h_end_hbm_src: int
         if wdw_size + h * step_size < h_src:
@@ -42,8 +42,7 @@ def interpolate_bilinear_2x_fwd(src_arr: Tile3D, chunk_size: int) -> Tile3D:
 
         p_tiles_count: int = (nc + PMAX - 1) // PMAX
 
-        p: int = 0
-        while p < p_tiles_count:
+        for p in nl_affine_range(p_tiles_count):
             out_tile: Tile3D = nl_ndarray_3d(PMAX, h_tile_size_dst, w_dst,
                                              src_arr.dtype, BUF_SBUF)
 
@@ -153,7 +152,5 @@ def interpolate_bilinear_2x_fwd(src_arr: Tile3D, chunk_size: int) -> Tile3D:
             tile_fancy_access_3d(out_tile, i_p_st, i_h_tile, i_w_st)
             nl_store_fancy_3d(dst_arr, i_p_hbm, i_h_hbm, i_w_st, nc, out_tile)
 
-            p = p + 1
-        h = h + 1
 
     return dst_arr

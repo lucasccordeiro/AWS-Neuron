@@ -7,6 +7,7 @@
 #   - new stubs: nisa_activation, nl_broadcast_to, nisa_tensor_tensor_scan
 
 from stubs import *
+nl_affine_range = range  # in-file rebind so the same-module range-alias pre-pass (esbmc/esbmc#4521) fires
 
 def mamba_v1(delta: Tile3D, u: Tile3D, A: Tile, B: Tile3D, C: Tile3D) -> Tile3D:
     batch_size: int = delta.d0
@@ -23,17 +24,14 @@ def mamba_v1(delta: Tile3D, u: Tile3D, A: Tile, B: Tile3D, C: Tile3D) -> Tile3D:
     channel_psize: int = PMAX
     n_channel_tile: int = channels // channel_psize
 
-    i_batch: int = 0
-    while i_batch < batch_size:
-        i_channel_tile: int = 0
-        while i_channel_tile < n_channel_tile:
+    for i_batch in nl_affine_range(batch_size):
+        for i_channel_tile in nl_affine_range(n_channel_tile):
             channel_start: int = i_channel_tile * channel_psize
 
             scanC_accum: Tile = nl_zeros_2d(channel_psize, seq_len,
                                             delta.dtype, BUF_SBUF)
 
-            i_state: int = 0
-            while i_state < state_size:
+            for i_state in nl_affine_range(state_size):
                 # Load delta, A, u, B, C tiles for this (batch, channel, state).
                 delta_slice: Tile = slice_3d_at(delta, i_batch,
                                                 channel_start,
@@ -95,7 +93,6 @@ def mamba_v1(delta: Tile3D, u: Tile3D, A: Tile, B: Tile3D, C: Tile3D) -> Tile3D:
                 # Accumulate scanC into scanC_accum (in place).
                 nisa_tensor_tensor(scanC_accum, scanC_accum, scanC)
 
-                i_state = i_state + 1
 
             # Store scanC_accum back to output[i_batch, channel_start:..., :]
             out_slice: Tile = slice_3d_at(output, i_batch,
@@ -104,7 +101,5 @@ def mamba_v1(delta: Tile3D, u: Tile3D, A: Tile, B: Tile3D, C: Tile3D) -> Tile3D:
                                           0, seq_len)
             nisa_dma_copy(out_slice, scanC_accum)
 
-            i_channel_tile = i_channel_tile + 1
-        i_batch = i_batch + 1
 
     return output

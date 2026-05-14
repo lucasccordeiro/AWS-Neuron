@@ -60,6 +60,16 @@ PMAX: int                 = 128
 GEMM_STATIONARY_FMAX: int = 128
 GEMM_MOVING_FMAX: int     = 512
 
+# ============================================================== Loop ranges
+# nl.affine_range(n) and nl.sequential_range(n) iterate [0, n). For
+# shape-and-bound verification they are semantically equivalent to
+# range(n); the NKI runtime distinguishes them to signal iteration
+# independence to the compiler. ESBMC's range-alias / range-wrapper
+# pre-passes (esbmc/esbmc#4521) make these zero-cost aliases.
+
+nl_affine_range = range
+nl_sequential_range = range
+
 # ============================================================== Allocation
 
 # nl.ndarray((d0, d1), dtype, buffer)
