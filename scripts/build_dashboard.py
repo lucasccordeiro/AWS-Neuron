@@ -130,6 +130,17 @@ def parse_rewrites_table(retrospective_md: str) -> list[RewriteRow]:
     return rows
 
 
+def parse_tier_definitions(roadmap_md: str) -> list[tuple[str, str]]:
+    """Pull `## Tier N — description` headings from ROADMAP.md.
+
+    Returns ordered list of (label, description). Label is "Tier N"; the
+    description preserves the optional trailing "(DONE)" / "(pending)"
+    marker so readers see status alongside scope.
+    """
+    pattern = re.compile(r"^## (Tier \d+) — (.+?)$", re.MULTILINE)
+    return [(m.group(1), m.group(2)) for m in pattern.finditer(roadmap_md)]
+
+
 def parse_roadmap_table(roadmap_md: str) -> list[RoadmapRow]:
     """Pull rows from ROADMAP.md's 'End-state estimates' table."""
     section = roadmap_md.split("## End-state estimates", 1)
@@ -220,7 +231,8 @@ def render_markdown_cell(text: str) -> str:
 
 def render_html(manifest, issues: list[IssueRow],
                 rewrites: list[RewriteRow],
-                roadmap: list[RoadmapRow]) -> str:
+                roadmap: list[RoadmapRow],
+                tiers: list[tuple[str, str]]) -> str:
     """Render the full dashboard as a single HTML string."""
     targets_by_kind: dict[str, int] = {}
     targets_by_family: dict[str, list] = {}
@@ -405,6 +417,21 @@ def render_html(manifest, issues: list[IssueRow],
         + '</tbody></table>'
     )
 
+    # ---- Tier legend
+    tier_items = [
+        f'<li><strong>{html.escape(label)}</strong> — {html.escape(desc)}</li>'
+        for label, desc in tiers
+    ]
+    tier_legend_html = (
+        '<p class="small" style="margin-top: 0;">'
+        'Milestones below are grouped by stub-library effort, not '
+        'preference. Each tier is a cumulative checkpoint:'
+        '</p>'
+        '<ul style="margin: 8px 0 16px 20px; font-size: 13px; padding: 0;">'
+        + "".join(tier_items)
+        + '</ul>'
+    )
+
     # ---- Roadmap: remaining + pending work
     n_done    = sum(1 for r in roadmap if r.status == "DONE")
     n_pending = sum(1 for r in roadmap if r.status == "pending")
@@ -501,7 +528,7 @@ def render_html(manifest, issues: list[IssueRow],
 
 <section>
   <h2>Remaining work — kernel coverage ({n_done} milestones done · {n_pending} pending)</h2>
-  <div>{roadmap_table}</div>
+  <div>{tier_legend_html}{roadmap_table}</div>
 </section>
 
 <section>
@@ -516,17 +543,19 @@ def render_html(manifest, issues: list[IssueRow],
 
 
 def main() -> int:
-    """Read manifest + issues + rewrites + roadmap, write dashboard.html at repo root."""
+    """Read manifest + issues + rewrites + roadmap + tier legend, write dashboard.html."""
     retrospective = (ROOT / "RETROSPECTIVE.md").read_text()
     roadmap_md = (ROOT / "ROADMAP.md").read_text()
     issues = parse_issues_table(retrospective)
     rewrites = parse_rewrites_table(retrospective)
     roadmap = parse_roadmap_table(roadmap_md)
-    output = render_html(verify.MANIFEST, issues, rewrites, roadmap)
+    tiers = parse_tier_definitions(roadmap_md)
+    output = render_html(verify.MANIFEST, issues, rewrites, roadmap, tiers)
     (ROOT / "dashboard.html").write_text(output)
     print(f"wrote {ROOT / 'dashboard.html'} "
           f"({len(verify.MANIFEST)} targets, {len(issues)} issues, "
-          f"{len(rewrites)} rewrites, {len(roadmap)} roadmap rows)")
+          f"{len(rewrites)} rewrites, {len(roadmap)} roadmap rows, "
+          f"{len(tiers)} tier definitions)")
     return 0
 
 
