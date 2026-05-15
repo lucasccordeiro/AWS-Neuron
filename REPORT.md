@@ -225,14 +225,14 @@ three local conventions:
    closes, all 62 `slice2d` / `slice_cols` 2-axis call sites stay in
    place. PR #4544 closed #4541 for the single-file case; PR #4549
    closed #4542 (heterogeneous-tuple key threading); PR #4551 closed
-   #4543 (bare-`:` modelling). The 2-file variant of #4545
-   (cross-module class) now also verifies as an incidental effect of
-   the recent PR chain. The actual residual gate is the **3-file
-   transitive-import case** of #4545: every PoC harness imports its
-   kernel which imports `stubs.py`, and that import chain still
-   crashes BMC symex with `symbolic_type_excp` when the kernel uses
-   natural-form `__getitem__` on its imported-type parameter. A second
-   blocker for the higher-arity sites is
+   #4543 (bare-`:` modelling); PR #4553 closed #4545 (2-file
+   cross-module case). The actual residual gate is the **3-file
+   transitive-import case**
+   ([esbmc/esbmc#4554](https://github.com/esbmc/esbmc/issues/4554)):
+   every PoC harness does `from stubs import *; from kernels.<name>
+   import <kernel>` and the kernel slices its imported-type parameter
+   — that chain still crashes BMC symex with `symbolic_type_excp`. A
+   second blocker for the higher-arity sites is
    [esbmc/esbmc#4552](https://github.com/esbmc/esbmc/issues/4552) —
    two cross-module classes with `__getitem__` at different subscript
    arities crash with `type mismatch: got pointer, expected struct`.
