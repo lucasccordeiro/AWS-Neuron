@@ -16,7 +16,7 @@
     min-height: 100vh;
   }
   .frame {
-    max-width: 1120px;
+    max-width: 1320px;
     margin: 0 auto;
   }
   h1 {
@@ -35,8 +35,9 @@
   .caption a { color: #0969da; text-decoration: none; }
   .panels {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1.3fr 1fr;
     gap: 20px;
+    align-items: start;
   }
   .panel {
     background: #ffffff;
@@ -64,6 +65,23 @@
     padding: 14px 18px;
     white-space: pre;
     overflow-x: auto;
+  }
+  .panel-caption {
+    padding: 10px 18px 14px;
+    border-top: 1px solid #d0d7de;
+    background: #f6f8fa;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #57606a;
+  }
+  .panel-caption code {
+    font-family: "SF Mono", "Menlo", "Consolas", monospace;
+    background: #ffffff;
+    border: 1px solid #d0d7de;
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: #1f2328;
   }
   .ln {
     display: inline-block;
@@ -140,19 +158,23 @@
   <div class="panel">
     <div class="panel-head">
       <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
-      <span class="filename">matmul_hoist_load_<span class="com">(pre-PR-#74)</span></span>
+      <span class="filename">harness/kernels/matmul_hoist_load_historical.py</span>
     </div>
-    <div class="panel-body"><span class="ln">31</span><span class="kw">for</span> m <span class="kw">in</span> <span class="fn">nl_affine_range</span>(M // TILE_M):
-<span class="ln">32</span>    <span class="com"># PRE-FIX BUG ↓</span>
-<span class="row-bad"><span class="ln">33</span>    lhsT_tiles = <span class="fn">nl_ndarray_3d</span>(
-<span class="ln">34</span>        K_TILES, TILE_K, <span class="red">TILE_N</span>,        <span class="arr">← should be TILE_M</span>
-<span class="ln">35</span>        lhsT.dtype, BUF_SBUF)</span>
-<span class="ln">36</span>    <span class="kw">for</span> k <span class="kw">in</span> <span class="fn">nl_affine_range</span>(K_TILES):
-<span class="ln">37</span>        <span class="fn">slab_set</span>(lhsT_tiles, k,
-<span class="ln">38</span>                 <span class="fn">nl_load_2d</span>(lhsT, k*TILE_K, (k+<span class="num">1</span>)*TILE_K,
-<span class="ln">39</span>                            m*TILE_M, (m+<span class="num">1</span>)*TILE_M))
-<span class="ln">40</span>    <span class="com"># loads a (TILE_K, TILE_M) slice into a slab</span>
-<span class="ln">41</span>    <span class="com"># allocated with free-dim TILE_N ≠ TILE_M</span></div>
+    <div class="panel-body"><span class="ln">34</span><span class="kw">for</span> m <span class="kw">in</span> <span class="fn">nl_affine_range</span>(M // TILE_M):
+<span class="ln">35</span>    <span class="com"># PRE-FIX BUG: free-dim was TILE_N (=GEMM_MOVING_FMAX), should be</span>
+<span class="ln">36</span>    <span class="com"># TILE_M (=GEMM_STATIONARY_FMAX). Fixed upstream by PR #74.</span>
+<span class="row-bad"><span class="ln">37</span>    lhsT_tiles: Tile3D = <span class="fn">nl_ndarray_3d</span>(K_TILES, TILE_K, <span class="red">TILE_N</span>,  <span class="arr">← TILE_M</span>
+<span class="ln">38</span>                                       lhsT.dtype, BUF_SBUF)</span>
+<span class="ln">39</span>    <span class="kw">for</span> k <span class="kw">in</span> <span class="fn">nl_affine_range</span>(K_TILES):
+<span class="ln">40</span>        <span class="fn">slab_set</span>(lhsT_tiles, k,
+<span class="ln">41</span>                 <span class="fn">nl_load_2d</span>(lhsT, k*TILE_K, (k+<span class="num">1</span>)*TILE_K,
+<span class="ln">42</span>                            m*TILE_M, (m+<span class="num">1</span>)*TILE_M))</div>
+    <div class="panel-caption">
+      The buggy line allocates the slab with free-dim
+      <code>TILE_N</code> (=512) but the inner <code>slab_set</code> loads
+      a <code>(TILE_K, TILE_M)</code> = (128, 128) slice — shape mismatch
+      on every iteration.
+    </div>
   </div>
 
   <!-- Right panel: ESBMC counterexample -->
