@@ -3,15 +3,7 @@
 # for the pool window to tile evenly. POOL = 2 and H, W = 6 + 2 * k for
 # k in [0, 2] gives H, W ∈ {6, 8, 10}; 3 * 3 = 9 shape combinations
 # exercising distinct .ap() max-offset bounds and pool-window counts.
-# Expected ESBMC verdict: VERIFICATION SUCCESSFUL (--unwind 5 --z3).
-#
-# Solver note: Bitwuzla 0.8.2 raises
-#   "term with unexpected sort at index 0"
-# while encoding the VCCs for this target. Z3 verifies in ~5 seconds.
-# The trigger is narrow — floor-division of a nondet passed as a function
-# argument — and is filed upstream as esbmc/esbmc#4548 with a 6-line
-# minimal reproducer. The verify.py manifest pins --z3 for this target
-# only; everything else still uses the default Bitwuzla.
+# Expected ESBMC verdict: VERIFICATION SUCCESSFUL (--unwind 5).
 
 from stubs import *
 from kernels.avgpool import tensor_avgpool_kernel

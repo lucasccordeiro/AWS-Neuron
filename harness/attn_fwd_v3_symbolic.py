@@ -6,16 +6,7 @@
 # tile counts (seqlen // FMAX_STATIONARY, seqlen // FMAX_MOVING,
 # seqlen // PMAX) are (4, 1, 4) and (8, 2, 8) respectively — distinct
 # asymmetric layouts that exercise different unwind paths.
-# Expected ESBMC verdict: VERIFICATION SUCCESSFUL (--unwind 9 --z3).
-#
-# Solver note: Bitwuzla 0.8.2 raises
-#   "term with unexpected sort at index 0"
-# while encoding this target's VCCs — same root cause as
-# `avgpool_symbolic`, filed upstream as esbmc/esbmc#4548 (floor-div of
-# a nondet passed as a function-call argument). Z3 verifies the same
-# program SUCCESSFUL in ~76 s. The verify.py manifest pins --z3 for
-# this target only; everything except `avgpool_symbolic` and this
-# target still uses the default Bitwuzla.
+# Expected ESBMC verdict: VERIFICATION SUCCESSFUL (--unwind 9).
 
 from stubs import *
 from kernels.attn_fwd_v3 import attn_fwd_v3
