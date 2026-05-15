@@ -138,6 +138,8 @@ def slice_cols(src: Tile, c0: int, c1: int) -> Tile:
 # ============================================================== Load / store (implicit-slice)
 
 # nl.load(tensor[r0:r1, c0:c1]) — HBM -> SBUF, slice is part of the call.
+# The returned partition dim (r1 - r0) must fit in PMAX — SBUF allocation
+# discipline (AUDIT Finding 14 closure).
 def nl_load_2d(src: Tile, r0: int, r1: int, c0: int, c1: int) -> Tile:
     assert 0 <= r0
     assert r0 <= r1
@@ -145,6 +147,7 @@ def nl_load_2d(src: Tile, r0: int, r1: int, c0: int, c1: int) -> Tile:
     assert 0 <= c0
     assert c0 <= c1
     assert c1 <= src.d1
+    assert (r1 - r0) <= PMAX
     return Tile(r1 - r0, c1 - c0, src.dtype, BUF_SBUF)
 
 # nl.store(tensor[r0:r1, c0:c1], value=tile) — SBUF -> HBM, slice + shape check.
@@ -773,10 +776,12 @@ def slice_4d_drop_d0_d1(t: Tile4D, k0: int, k1: int) -> Tile:
 
 # nl.load(src[k]) — load the k-th 2-D slab of a 3-D HBM tile into SBUF.
 # Combines slab_get + nisa.dma_copy into one call, matching the upstream
-# `nl.load(t[k])` idiom.
+# `nl.load(t[k])` idiom. The slab's leading axis (src.d1) becomes the
+# SBUF partition dim and must fit in PMAX (AUDIT Finding 14).
 def nl_load_3d_slot(src: Tile3D, k: int) -> Tile:
     assert 0 <= k
     assert k < src.d0
+    assert src.d1 <= PMAX
     return Tile(src.d1, src.d2, src.dtype, BUF_SBUF)
 
 # nl.store(dst[k], value) — write a 2-D SBUF tile into the k-th slab of
@@ -789,7 +794,8 @@ def nl_store_3d_slot(dst: Tile3D, k: int, value: Tile) -> None:
 
 # nl.load(src[i, r0:r1, c0:c1]) — load a 3-D slice into SBUF. The scalar
 # axis is dropped; the range axes become the result's (d0, d1). Combines
-# slice_3d_at + nisa.dma_copy.
+# slice_3d_at + nisa.dma_copy. Returned partition dim (r1 - r0) must fit
+# in PMAX (AUDIT Finding 14).
 def nl_load_3d_at(src: Tile3D, i: int, r0: int, r1: int,
                   c0: int, c1: int) -> Tile:
     assert 0 <= i
@@ -800,6 +806,7 @@ def nl_load_3d_at(src: Tile3D, i: int, r0: int, r1: int,
     assert 0 <= c0
     assert c0 <= c1
     assert c1 <= src.d2
+    assert (r1 - r0) <= PMAX
     return Tile(r1 - r0, c1 - c0, src.dtype, BUF_SBUF)
 
 # ============================================================== 5-D views (.ap)
