@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Real bug caught by ESBMC: aws-neuron/nki-samples PR #74</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 40px;
+    background: #0d1117;
+    color: #c9d1d9;
+    font-family: "SF Mono", "Menlo", "Consolas", monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+  .frame {
+    max-width: 1120px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 22px;
+    font-weight: 600;
+    margin: 0 0 6px 0;
+    color: #f0f6fc;
+  }
+  .caption {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 14px;
+    color: #8b949e;
+    margin: 0 0 24px 0;
+  }
+  .caption a { color: #58a6ff; text-decoration: none; }
+  .panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  .panel {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .panel-head {
+    background: #21262d;
+    border-bottom: 1px solid #30363d;
+    padding: 8px 14px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 12px;
+    color: #8b949e;
+  }
+  .panel-head .dot { display: inline-block; width: 10px; height: 10px;
+                     border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+  .dot.r { background: #f85149; }
+  .dot.y { background: #d29922; }
+  .dot.g { background: #3fb950; }
+  .panel-head .filename {
+    color: #c9d1d9; margin-left: 10px;
+  }
+  .panel-body {
+    padding: 14px 18px;
+    white-space: pre;
+    overflow-x: auto;
+  }
+  .ln {
+    display: inline-block;
+    width: 28px;
+    color: #6e7681;
+    user-select: none;
+    text-align: right;
+    margin-right: 16px;
+  }
+  .row-bad {
+    background: rgba(248, 81, 73, 0.10);
+    margin: 0 -18px;
+    padding: 0 18px;
+    border-left: 3px solid #f85149;
+    padding-left: 15px;
+  }
+  .kw  { color: #ff7b72; }
+  .num { color: #79c0ff; }
+  .fn  { color: #d2a8ff; }
+  .str { color: #a5d6ff; }
+  .com { color: #8b949e; font-style: italic; }
+  .arr { color: #ffa657; }
+  .red { color: #f85149; font-weight: 600; }
+  .grn { color: #56d364; font-weight: 600; }
+  .between {
+    text-align: center;
+    margin: 18px 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: #8b949e;
+    font-size: 13px;
+  }
+  .between code {
+    background: #21262d;
+    padding: 3px 8px;
+    border-radius: 4px;
+    color: #c9d1d9;
+  }
+  footer {
+    margin-top: 28px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 12px;
+    color: #6e7681;
+    border-top: 1px solid #30363d;
+    padding-top: 14px;
+  }
+  footer a { color: #58a6ff; text-decoration: none; }
+  .vals {
+    display: inline-block;
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: #1c2128;
+    border-left: 3px solid #d29922;
+    border-radius: 4px;
+    font-size: 13px;
+    color: #c9d1d9;
+  }
+  .vals .label { color: #8b949e; }
+  .vals .v     { color: #ffa657; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="frame">
+
+<h1>A real upstream bug, caught in 2 seconds.</h1>
+<p class="caption">
+  <a href="https://github.com/aws-neuron/nki-samples/pull/74">aws-neuron/nki-samples PR #74</a>
+  — “matmul sbuf allocation dimension fix” — reproduced retroactively by ESBMC.
+</p>
+
+<div class="panels">
+
+  <!-- Left panel: the buggy code -->
+  <div class="panel">
+    <div class="panel-head">
+      <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+      <span class="filename">matmul_hoist_load_<span class="com">(pre-PR-#74)</span></span>
+    </div>
+    <div class="panel-body"><span class="ln">31</span><span class="kw">for</span> m <span class="kw">in</span> <span class="fn">nl_affine_range</span>(M // TILE_M):
+<span class="ln">32</span>    <span class="com"># PRE-FIX BUG ↓</span>
+<span class="row-bad"><span class="ln">33</span>    lhsT_tiles = <span class="fn">nl_ndarray_3d</span>(
+<span class="ln">34</span>        K_TILES, TILE_K, <span class="red">TILE_N</span>,        <span class="arr">← should be TILE_M</span>
+<span class="ln">35</span>        lhsT.dtype, BUF_SBUF)</span>
+<span class="ln">36</span>    <span class="kw">for</span> k <span class="kw">in</span> <span class="fn">nl_affine_range</span>(K_TILES):
+<span class="ln">37</span>        <span class="fn">slab_set</span>(lhsT_tiles, k,
+<span class="ln">38</span>                 <span class="fn">nl_load_2d</span>(lhsT, k*TILE_K, (k+<span class="num">1</span>)*TILE_K,
+<span class="ln">39</span>                            m*TILE_M, (m+<span class="num">1</span>)*TILE_M))
+<span class="ln">40</span>    <span class="com"># loads a (TILE_K, TILE_M) slice into a slab</span>
+<span class="ln">41</span>    <span class="com"># allocated with free-dim TILE_N ≠ TILE_M</span></div>
+  </div>
+
+  <!-- Right panel: ESBMC counterexample -->
+  <div class="panel">
+    <div class="panel-head">
+      <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+      <span class="filename">esbmc harness/matmul_hoist_load_historical.py</span>
+    </div>
+    <div class="panel-body">Symex completed in: <span class="num">0.243s</span>  (<span class="num">1279</span> assignments)
+Slicing time:      0.004s  (removed <span class="num">1259</span> assignments)
+Generated <span class="num">1014</span> VCC(s), <span class="num">1</span> remaining after simplification
+Solving with solver Bitwuzla 0.8.2
+Runtime decision procedure: <span class="num">0.001s</span>
+
+[Counterexample]
+
+State 1   stubs.py:<span class="num">183</span>   in <span class="fn">slab_set</span>
+
+<span class="kw">Violated property:</span>
+  assertion  <span class="red">value.d1 == t.d2</span>
+
+<span class="red">VERIFICATION FAILED</span></div>
+  </div>
+
+</div>
+
+<div class="between">
+  total run time:&nbsp; <code>~2 s</code> &nbsp;·&nbsp; default solver &nbsp;·&nbsp; stock laptop
+</div>
+
+<div style="text-align: center; margin: 12px 0;">
+  <div class="vals">
+    <span class="label">at the failing call:</span>&nbsp;&nbsp;
+    <span class="v">value.d1 = 128</span>
+    <span class="label">(TILE_K × TILE_M slice being loaded)</span>
+    &nbsp;&nbsp;
+    <span class="v">t.d2 = 512</span>
+    <span class="label">(slab allocated with TILE_N)</span>
+  </div>
+</div>
+
+<footer>
+  Source-faithful port of upstream NKI kernel · contract written once in
+  <code style="background: #161b22; padding: 2px 6px; border-radius: 3px;">stubs.py</code> ·
+  catches the bug across every code path the kernel can reach.
+  <br>
+  <a href="https://github.com/lucasccordeiro/AWS-Neuron">github.com/lucasccordeiro/AWS-Neuron</a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/esbmc/esbmc">github.com/esbmc/esbmc</a>
+</footer>
+
+</div>
+</body>
+</html>
