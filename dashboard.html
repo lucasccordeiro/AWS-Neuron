@@ -60,7 +60,7 @@
   <h2>Status at a glance</h2>
   <div>
     <div class="stat-grid">
-      <div class="stat"><div class="v">49/49</div><div class="l">targets verified</div></div>
+      <div class="stat"><div class="v">51/51</div><div class="l">targets verified</div></div>
       <div class="stat"><div class="v">19</div><div class="l">NKI kernel functions</div></div>
       <div class="stat"><div class="v">11</div><div class="l">families (6 tutorial / 5 contributed)</div></div>
       <div class="stat"><div class="v">1</div><div class="l">real upstream bug caught<br><span class="small">aws-neuron/nki-samples#74</span></div></div>
@@ -70,7 +70,7 @@
 </section>
 
 <section>
-  <h2>Targets (49)</h2>
+  <h2>Targets (51)</h2>
   <div><div class="legend"><span class="kind concrete">concrete</span> good kernel, fixed shape · <span class="kind buggy">buggy</span> positive-control bug · <span class="kind symbolic">symbolic</span> bounded shape family · <span class="kind historical">historical</span> retroactive bug repro · <span class="kind skeleton">skeleton</span> partial port</div><table><thead><tr><th>Target</th><th>Kind</th><th>Family</th><th>Expected</th><th>ESBMC flags</th></tr></thead><tbody><tr><td><code>tensor_add</code></td><td><span class="kind concrete">concrete</span></td><td>tensor_addition</td><td><code>SUCCESSFUL</code></td><td><code class="small"></code></td></tr>
 <tr><td><code>tensor_add_buggy</code></td><td><span class="kind buggy">buggy</span></td><td>tensor_addition</td><td><code>FAILED</code></td><td><code class="small"></code></td></tr>
 <tr><td><code>tensor_add_symbolic</code></td><td><span class="kind symbolic">symbolic</span></td><td>tensor_addition</td><td><code>SUCCESSFUL</code></td><td><code class="small">--unwind 6</code></td></tr>
@@ -85,6 +85,8 @@
 <tr><td><code>interpolate_bilinear_buggy</code></td><td><span class="kind buggy">buggy</span></td><td>contributed/interpolate_bilinear_fwd</td><td><code>FAILED</code></td><td><code class="small"></code></td></tr>
 <tr><td><code>interpolate_trilinear</code></td><td><span class="kind concrete">concrete</span></td><td>contributed/interpolate_trilinear_fwd</td><td><code>SUCCESSFUL</code></td><td><code class="small"></code></td></tr>
 <tr><td><code>interpolate_trilinear_buggy</code></td><td><span class="kind buggy">buggy</span></td><td>contributed/interpolate_trilinear_fwd</td><td><code>FAILED</code></td><td><code class="small"></code></td></tr>
+<tr><td><code>interpolate_bilinear_chunk1</code></td><td><span class="kind concrete">concrete</span></td><td>contributed/interpolate_bilinear_fwd</td><td><code>FAILED</code></td><td><code class="small"></code></td></tr>
+<tr><td><code>interpolate_trilinear_chunk1</code></td><td><span class="kind concrete">concrete</span></td><td>contributed/interpolate_trilinear_fwd</td><td><code>FAILED</code></td><td><code class="small"></code></td></tr>
 <tr><td><code>matmul_basic</code></td><td><span class="kind concrete">concrete</span></td><td>matrix_multiplication</td><td><code>SUCCESSFUL</code></td><td><code class="small"></code></td></tr>
 <tr><td><code>matmul_basic_buggy</code></td><td><span class="kind buggy">buggy</span></td><td>matrix_multiplication</td><td><code>FAILED</code></td><td><code class="small"></code></td></tr>
 <tr><td><code>mamba_v1</code></td><td><span class="kind concrete">concrete</span></td><td>fused_mamba</td><td><code>SUCCESSFUL</code></td><td><code class="small"></code></td></tr>
@@ -150,8 +152,8 @@
   <h2>Kernel coverage (11 families)</h2>
   <div><div class="family-list"><div class="f"><div class="h">attention_fwd_performance <span class="small">(tutorial)</span></div><div class="targets"><span class="kind concrete">attn_fwd_v1</span>, <span class="kind buggy">attn_fwd_v1_buggy</span>, <span class="kind concrete">attn_fwd_v2</span>, <span class="kind buggy">attn_fwd_v2_buggy</span>, <span class="kind concrete">attn_fwd_v3</span>, <span class="kind buggy">attn_fwd_v3_buggy</span>, <span class="kind symbolic">attn_fwd_v3_symbolic</span></div></div>
 <div class="f"><div class="h">average_pool2d <span class="small">(tutorial)</span></div><div class="targets"><span class="kind concrete">avgpool</span>, <span class="kind buggy">avgpool_buggy</span>, <span class="kind symbolic">avgpool_symbolic</span></div></div>
-<div class="f"><div class="h">contributed/interpolate_bilinear_fwd <span class="small">(contributed)</span></div><div class="targets"><span class="kind concrete">interpolate_bilinear</span>, <span class="kind buggy">interpolate_bilinear_buggy</span>, <span class="kind symbolic">interpolate_bilinear_symbolic</span></div></div>
-<div class="f"><div class="h">contributed/interpolate_trilinear_fwd <span class="small">(contributed)</span></div><div class="targets"><span class="kind concrete">interpolate_trilinear</span>, <span class="kind buggy">interpolate_trilinear_buggy</span>, <span class="kind symbolic">interpolate_trilinear_symbolic</span></div></div>
+<div class="f"><div class="h">contributed/interpolate_bilinear_fwd <span class="small">(contributed)</span></div><div class="targets"><span class="kind concrete">interpolate_bilinear</span>, <span class="kind buggy">interpolate_bilinear_buggy</span>, <span class="kind concrete">interpolate_bilinear_chunk1</span>, <span class="kind symbolic">interpolate_bilinear_symbolic</span></div></div>
+<div class="f"><div class="h">contributed/interpolate_trilinear_fwd <span class="small">(contributed)</span></div><div class="targets"><span class="kind concrete">interpolate_trilinear</span>, <span class="kind buggy">interpolate_trilinear_buggy</span>, <span class="kind concrete">interpolate_trilinear_chunk1</span>, <span class="kind symbolic">interpolate_trilinear_symbolic</span></div></div>
 <div class="f"><div class="h">contributed/matmul <span class="small">(contributed)</span></div><div class="targets"><span class="kind concrete">matmul</span>, <span class="kind concrete">matmul_big</span>, <span class="kind buggy">matmul_buggy</span></div></div>
 <div class="f"><div class="h">contributed/maxpooling <span class="small">(contributed)</span></div><div class="targets"><span class="kind concrete">maxpooling</span>, <span class="kind buggy">maxpooling_buggy</span>, <span class="kind symbolic">maxpooling_symbolic</span></div></div>
 <div class="f"><div class="h">contributed/pipelined_attention <span class="small">(contributed)</span></div><div class="targets"><span class="kind skeleton">pipelined_attention</span></div></div>

@@ -437,3 +437,84 @@ inherited the laxer contract. When two stubs in the same family differ
 in their preconditions, the asymmetric weaker one is almost always
 the bug. Sweep symmetrically when adding a new stub in an established
 family.
+
+---
+
+## Finding 15 — upstream input-validation gap in interpolate bilinear/trilinear
+
+Surfaced during a review of `contributed/interpolate_bilinear_fwd.py` and
+`contributed/interpolate_trilinear_fwd.py`. The two kernels share the
+same one-line host-side trip-count expression (copy-pasted byte-for-byte,
+modulo the `h_src` ↔ `d_src` rename):
+
+```python
+wdw_size = chunk_size
+step_size = wdw_size - 1
+for h in nl.static_range(math.ceil((h_src - wdw_size) / step_size) + 1):
+    ...
+```
+
+That expression has two distinct failure modes on degenerate input:
+
+1. **chunk_size == 1** (F-02 / F-03). `step_size = 0`, the division
+   raises `ZeroDivisionError` at `nl.static_range(...)` JIT-time. Loud
+   crash, confusing traceback, no precondition error.
+
+2. **x_src == 1** with chunk_size ≥ 2 (F-01 / F-04). For
+   `x_src = 1`: `math.ceil((1 - chunk_size) / (chunk_size - 1)) + 1`
+   reduces to `math.ceil(-1.0) + 1 = -1 + 1 = 0`. The for-loop trips
+   zero times. `dst_arr` is allocated but never written. Silent empty
+   output — no exception, no error code, no diagnostic. A real caller
+   trying to interpolate a 1-row image gets uninitialised memory back.
+
+Both failures collapse to a missing two-line precondition guard:
+
+```python
+assert chunk_size >= 2
+assert x_src     >= 2
+```
+
+### PoC port behaviour
+
+`harness/kernels/interpolate_bilinear.py` (line 24) and
+`harness/kernels/interpolate_trilinear.py` (line 27) both already
+include `assert step_size > 0` — a deviation from source-faithful port
+added during the original port that catches F-02 / F-03 cleanly under
+ESBMC. **Documented here so the deviation has provenance**: it isn't a
+"silent enhancement"; it's a soundness improvement on the upstream and
+recorded as such.
+
+The `x_src == 1` case (F-01 / F-04) is **not caught** by our verifier.
+The kernel allocates a valid output tile, the loop body never enters,
+the function returns. No shape contract is violated, no out-of-bounds
+fancy access fires, no DMA-copy shape mismatch surfaces. ESBMC would
+report `VERIFICATION SUCCESSFUL` for a `h_src = 1` harness — the kernel
+silently does nothing. This is a discrimination boundary: our
+shape-and-bounds verifier doesn't track "kernel must write to its
+output," and so silent-no-op-on-degenerate-input bugs slip through.
+
+### Two new regression targets
+
+`interpolate_bilinear_chunk1` and `interpolate_trilinear_chunk1` call
+the kernel with `chunk_size = 1`. Expected verdict: `VERIFICATION
+FAILED` at the `assert step_size > 0` precondition. These targets pin
+F-02 / F-03's detection: if someone later removes the step_size assert
+without adding upstream-side validation, these tests catch the
+regression.
+
+### Filed upstream?
+
+Reported as `aws-neuron/nki-samples` issue (pending). The upstream
+kernels would benefit from:
+- explicit `assert chunk_size >= 2`
+- explicit `assert h_src >= 2` / `d_src >= 2`
+or equivalent docstring preconditions if the kernels are intended only
+for non-degenerate input.
+
+### Lesson
+
+Shape-and-bounds verification is a partial completeness story.
+"Silent no-op" failures don't trigger contract violations because no
+contract is violated; they fail at the semantic-correctness level. Our
+verifier explicitly does not promise to catch them — but documenting
+the boundary in AUDIT keeps the soundness/completeness claim honest.

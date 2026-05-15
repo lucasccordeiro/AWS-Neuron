@@ -8,10 +8,11 @@ assumes familiarity with the verifier but not with NKI.
 
 - **19 NKI kernel functions ported** (across 11 upstream source files —
   6 tutorials, 5 community-`contributed/` kernels, one of which is a
-  shape-skeleton port only), 49 build targets (concrete +
+  shape-skeleton port only), 51 build targets (concrete +
   positive-control + 10 symbolic-shape variants + 1 historical-bug
-  reproduction + 1 shape-skeleton), 100 % pass rate against expected
-  verdicts; full regression in about 5 minutes wall-clock on Bitwuzla.
+  reproduction + 1 shape-skeleton + 2 boundary-input regression
+  targets), 100 % pass rate against expected verdicts; full regression
+  in about 5 minutes wall-clock on Bitwuzla.
 - **6 ESBMC Python-frontend issues filed upstream**, 2 already
   fixed-and-merged (#4509, #4510). 4 still open (#4513–#4516).
 - **1 real upstream bug caught retroactively** —
@@ -24,6 +25,15 @@ assumes familiarity with the verifier but not with NKI.
   Finding 12's "sweep follow-up" (the matmul dtype contract applies to
   both `nl_matmul` and the ISA cousins) was caught by attn_fwd_v2 on
   first run, validating the established workflow.
+- **AUDIT.md Finding 15**: upstream input-validation gap in
+  `interpolate_bilinear_fwd.py` / `interpolate_trilinear_fwd.py` —
+  the host-side trip-count expression has two failure modes
+  (chunk_size=1 → ZeroDivisionError; x_src=1 → silent empty output).
+  The first is caught by an added `assert step_size > 0` in our port
+  (regression-pinned via the new `*_chunk1` targets). The second is a
+  discrimination boundary: shape-and-bounds verification doesn't
+  detect "kernel did nothing" — documented honestly as a soundness
+  vs completeness limit. To be reported upstream.
 - **One novel verification pattern** (nondet representative elements for
   fancy-index bound checks) which generalised across maxpooling, both
   interpolate variants, and is reusable for any mgrid-style code.
