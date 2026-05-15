@@ -226,7 +226,11 @@ three local conventions:
    place; the higher-arity `slice_3d_at` / `slice_4d_drop_d0_d1` /
    `slab_cols_*` sites (~86 sites) are gated by
    [esbmc/esbmc#4542](https://github.com/esbmc/esbmc/issues/4542),
-   filed for heterogeneous-tuple key threading. A third related issue
+   filed for heterogeneous-tuple key threading. PR #4544 closed #4541
+   for the single-file case; the cross-module form (class imported
+   from another module) is the actual residual gate, filed as
+   [esbmc/esbmc#4545](https://github.com/esbmc/esbmc/issues/4545).
+   A third related issue
    ([#4543](https://github.com/esbmc/esbmc/issues/4543)) records the
    `:`-modelled-as-`slice(0, 0)` gap that forces full-axis to be spelled
    `0:t.d0` instead of `:`; orthogonal to the threading concerns but
