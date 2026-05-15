@@ -322,16 +322,23 @@ Deferred:
   the basic softmax-chain prerequisite, but pipelining and producer/
   consumer queues are still unmodelled.
 - `contributed/pipelined_attention.py` — Flash Attention with software
-  pipelining. **Out of current modelling scope.** Uses custom
+  pipelining. **Shape-skeleton port landed**: `flash_fwd_shell`
+  verifies the kernel's top-level I/O contract and the outer
+  running-statistic SBUF buffer shapes. The inner attention pipeline
+  (`load_q` / `qk_and_max` / `update_max` / `exp` / `tp` / `pv` /
+  `write_back`) is not yet modelled — extending requires custom
   `sb_mod(base_addr=, num_free_tiles=)` and `psum.alloc(<callback>)`
-  allocators, `par_dim(n)` shape-tuple wrappers, nested function
-  definitions inside the kernel, 2-D `nl.mgrid` with destructure,
-  3-D fancy load with mixed-axis index arithmetic, `nl.program_id`,
-  `nl.shared_constant`, `@nki.baremetal`; the 16K seqlen produces
-  nested loop counts (128, 64, 16, 4) that would also stress BMC
-  unwinding. Each feature is independently a modelling decision; the
-  bundle is multi-day work, not multi-hour. Recorded for a future
-  expansion if Flash Attention coverage becomes a goal.
+  allocators (currently stripped to plain `BUF_SBUF`/`BUF_PSUM`),
+  `par_dim(n)` shape-tuple wrappers (currently dropped), nested
+  function definitions (untested in ESBMC), 2-D `nl.mgrid` with
+  multi-return destructure, 3-D fancy load with mixed scalar +
+  IndexTensor + arithmetic indexing (related to ESBMC issue #4542),
+  5-D and 6-D allocations, and `nl.program_id` / `nl.shared_constant` /
+  `@nki.baremetal`. The 16K seqlen also produces large nested loop
+  counts (128, 64, 16, 4); the toy-shape port uses seqlen 2048 to
+  keep BMC unwinding feasible while preserving the divisibility
+  chain (seqlen_q % section_len == 0, section_len % 2048 == 0,
+  section_len % 512 == 0, section_len % 128 == 0).
 - `tutorials/mxfp-matmul` — Microscaled-FP quantization; dtype-heavy
   and shape-light, so verification depth is low for this PoC's model.
 
@@ -376,6 +383,7 @@ between operands, partition-dim limit violations, hardware-shape
 violations on the matmul unit — are exactly the high-volume failure
 modes a static checker can address up front. The PoC shows that the
 engineering surface is small (a single ~865-line stub library covers
-eighteen NKI kernel functions across six tutorials and four contributed
-kernels) and that the verifier is fast (the full 48-target suite
-finishes in about five minutes).
+nineteen NKI kernel functions across six tutorials and five contributed
+kernels, the last of those as a shape-skeleton port) and that the
+verifier is fast (the full 49-target suite finishes in about five
+minutes).

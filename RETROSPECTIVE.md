@@ -6,10 +6,11 @@ assumes familiarity with the verifier but not with NKI.
 
 ## TL;DR
 
-- **18 NKI kernel functions ported** (across 10 upstream source files —
-  6 tutorials, 4 community-`contributed/` kernels), 48 build targets
-  (concrete + positive-control + 10 symbolic-shape variants + 1
-  historical-bug reproduction), 100 % pass rate against expected
+- **19 NKI kernel functions ported** (across 11 upstream source files —
+  6 tutorials, 5 community-`contributed/` kernels, one of which is a
+  shape-skeleton port only), 49 build targets (concrete +
+  positive-control + 10 symbolic-shape variants + 1 historical-bug
+  reproduction + 1 shape-skeleton), 100 % pass rate against expected
   verdicts; full regression in about 5 minutes wall-clock on Bitwuzla
   (`avgpool_symbolic` and `attn_fwd_v3_symbolic` use Z3 to dodge
   esbmc/esbmc#4548).
@@ -66,7 +67,7 @@ filed ESBMC issue (#4514–#4516).
 | `contributed/maxpooling.py` | community | good + buggy + symbolic-shape |
 | `contributed/interpolate_bilinear_fwd.py` | community | good + buggy + symbolic-shape |
 | `contributed/interpolate_trilinear_fwd.py` | community | good + buggy + symbolic-shape (8 combos over D×H×W ∈ {10, 19}³) |
-| `contributed/pipelined_attention.py` | community | deferred (attention-specific primitives) |
+| `contributed/pipelined_attention.py` | community | **shape-skeleton port only** — top-level I/O contract verifies SUCCESSFUL; inner Flash Attention pipeline (load_q / qk_and_max / update_max / exp / tp / pv / write_back) deferred to a dedicated session (see ROADMAP) |
 | `tutorials/{mxfp-matmul, attention_fwd_performance}` | tutorials | not attempted |
 
 ## Stub library surface
