@@ -170,6 +170,23 @@
 <tr><td><code>@nki.jit</code> decorator</td><td>stripped at port time</td><td><span class="status RESOLVED">RETIRED</span></td><td>(not an ESBMC issue)</td></tr></tbody></table></div>
 </section>
 
+<section>
+  <h2>Remaining work — kernel coverage (6 milestones done · 1 pending)</h2>
+  <div><table><thead><tr><th>Milestone</th><th>Targets</th><th>Status</th><th>Notes</th></tr></thead><tbody><tr><td>Tier 1</td><td><code class="small">34</code></td><td><span class="status RESOLVED">DONE</span></td><td><strong>DONE</strong></td></tr>
+<tr><td>Tier 1 + Tier 2</td><td><code class="small">37</code></td><td><span class="status RESOLVED">DONE</span></td><td><strong>DONE</strong> (incl. PR #74 historical-bug repro)</td></tr>
+<tr><td>Tier 1 + Tier 2 + Tier 3 pilot</td><td><code class="small">39</code></td><td><span class="status RESOLVED">DONE</span></td><td><strong>DONE</strong></td></tr>
+<tr><td>+ attn_fwd_v2</td><td><code class="small">41</code></td><td><span class="status RESOLVED">DONE</span></td><td><strong>DONE</strong></td></tr>
+<tr><td>+ attn_fwd_v3</td><td><code class="small">43</code></td><td><span class="status RESOLVED">DONE</span></td><td><strong>DONE</strong></td></tr>
+<tr><td>+ Tier-3 symbolic batch (avgpool/mamba_v3/matmul_tiled/attn_fwd_v3 symbolic) + pipelined shape-skeleton</td><td><code class="small">49</code></td><td><span class="status RESOLVED">DONE</span></td><td><strong>DONE</strong></td></tr>
+<tr><td>pipelined_attention inner pipeline (full Flash Attention)</td><td><code class="small">~51</code></td><td><span class="status OPEN">PENDING</span></td><td>pending — see note above</td></tr></tbody></table></div>
+</section>
+
+<section>
+  <h2>Remaining work — source-fidelity blockers (2 open)</h2>
+  <div><p class="small" style="margin-top: 0;">These ESBMC issues are the path-of-record blockers for retiring the remaining PoC workarounds. Closing them unlocks the corresponding source-fidelity work without any new modelling.</p><table><thead><tr><th>Issue</th><th>What</th><th>PoC impact</th></tr></thead><tbody><tr><td><a href="https://github.com/esbmc/esbmc/issues/4545">#4545</a></td><td><code>__getitem__</code> on a parameter whose class is imported from another module crashes at BMC symex (<code>symbolic_type_excp</code>)</td><td>every PoC kernel imports <code>Tile</code> from <code>stubs.py</code> — keeps <code>slice2d</code> / <code>slice_cols</code> in place across all 62 two-axis call sites</td></tr>
+<tr><td><a href="https://github.com/esbmc/esbmc/issues/4543">#4543</a></td><td>bare <code>:</code> slice modelled as <code>slice(0, 0)</code>, indistinguishable from explicit <code>0:0</code> empty slice (Python semantics: <code>slice(None, None, None)</code>)</td><td>forces callers to spell full-axis as <code>t[0:t.d0, ...]</code> instead of upstream NKI&#x27;s natural <code>t[:, ...]</code>; surfaced during the #4540 / #4541 testing</td></tr></tbody></table></div>
+</section>
+
 </main>
 </body>
 </html>
