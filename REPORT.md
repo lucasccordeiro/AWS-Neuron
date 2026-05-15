@@ -206,18 +206,26 @@ three local conventions:
 2. **`@nki.jit` decorator stripped.** Trivial — `nki.jit` is an
    unmodelled symbol, not an ESBMC limitation.
 3. **Tile slicing `a[i:j, k:l]` → `slice2d(a, i, j, k, l)`.** The only
-   active *source* rewrite. The conversion-time blocker was
-   esbmc/esbmc#4523 (closed by
-   [PR #4528](https://github.com/esbmc/esbmc/pull/4528)); single-slice
-   propagation into user-defined `__getitem__` (esbmc/esbmc#4537) was
-   closed by
-   [PR #4538](https://github.com/esbmc/esbmc/pull/4538) — `a[i:j]`
-   now works natively. The residual gate is the multi-axis case
-   ([esbmc/esbmc#4539](https://github.com/esbmc/esbmc/issues/4539)):
-   the tuple of slices is constructed at the call site but the backing
-   list reaches `__getitem__` empty, so `key[0]` reads out of bounds.
-   Until #4539 closes, all 125 `slice2d` / `slice_cols` / `slice_3d_at`
-   call sites stay in place.
+   active *source* rewrite. Successive ESBMC fixes have been chipping
+   at the natural form: conversion-time slice handling
+   ([#4523](https://github.com/esbmc/esbmc/issues/4523)) by
+   [PR #4528](https://github.com/esbmc/esbmc/pull/4528), single-slice
+   propagation into user `__getitem__`
+   ([#4537](https://github.com/esbmc/esbmc/issues/4537)) by
+   [PR #4538](https://github.com/esbmc/esbmc/pull/4538), and tuple-of-
+   slices on locally-constructed instances
+   ([#4539](https://github.com/esbmc/esbmc/issues/4539)) by
+   [PR #4540](https://github.com/esbmc/esbmc/pull/4540). The current
+   residual gate is **parameter-instance receivers**: every PoC kernel
+   takes its `Tile` inputs as parameters and slices them
+   (`a_input[r0:r1, c0:c1]` inside the kernel body), and that pattern
+   still crashes ESBMC at `make_member` (constant slice indices) or
+   `symbolic_type_excp` (parametric), filed as
+   [#4541](https://github.com/esbmc/esbmc/issues/4541). Until #4541
+   closes, all 62 `slice2d` / `slice_cols` 2-axis call sites stay in
+   place; the higher-arity `slice_3d_at` / `slice_4d_drop_d0_d1` /
+   `slab_cols_*` sites need additional support for mixed scalar+slice
+   tuples, which neither #4540 nor #4541 covers.
 
 For-loops are native (`for m in nl_affine_range(N):`); tuple
 destructuring is native (`M, N = a.shape`); the `nl_affine_range`
