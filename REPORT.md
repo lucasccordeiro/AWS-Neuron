@@ -224,19 +224,20 @@ three local conventions:
    [#4541](https://github.com/esbmc/esbmc/issues/4541). Until #4541
    closes, all 62 `slice2d` / `slice_cols` 2-axis call sites stay in
    place. PR #4544 closed #4541 for the single-file case; PR #4549
-   closed #4542 (heterogeneous-tuple key threading) for the same. The
-   actual residual gate is
-   [esbmc/esbmc#4545](https://github.com/esbmc/esbmc/issues/4545) —
-   any natural-form subscript on a parameter whose class is imported
-   from another module still crashes BMC symex with `symbolic_type_excp`,
-   regardless of whether the tuple is pure-slice or heterogeneous.
-   Every PoC kernel imports `Tile`/`Tile3D`/`Tile4D` from `stubs.py`, so
-   all 148 slice-rewrite call sites (62 two-axis + ~86 higher-arity)
-   stay in place until #4545 closes. A related issue
-   ([#4543](https://github.com/esbmc/esbmc/issues/4543)) records the
-   `:`-modelled-as-`slice(0, 0)` gap that forces full-axis to be spelled
-   `0:t.d0` instead of `:`; orthogonal to the threading concerns but
-   visible from the same surface.
+   closed #4542 (heterogeneous-tuple key threading); PR #4551 closed
+   #4543 (bare-`:` modelling). The 2-file variant of #4545
+   (cross-module class) now also verifies as an incidental effect of
+   the recent PR chain. The actual residual gate is the **3-file
+   transitive-import case** of #4545: every PoC harness imports its
+   kernel which imports `stubs.py`, and that import chain still
+   crashes BMC symex with `symbolic_type_excp` when the kernel uses
+   natural-form `__getitem__` on its imported-type parameter. A second
+   blocker for the higher-arity sites is
+   [esbmc/esbmc#4552](https://github.com/esbmc/esbmc/issues/4552) —
+   two cross-module classes with `__getitem__` at different subscript
+   arities crash with `type mismatch: got pointer, expected struct`.
+   Both blockers must close for all 148 slice-rewrite call sites to
+   retire (62 two-axis + ~86 higher-arity).
 
 For-loops are native (`for m in nl_affine_range(N):`); tuple
 destructuring is native (`M, N = a.shape`); the `nl_affine_range`
