@@ -393,3 +393,47 @@ a symmetry blind spot when the toy shape happens to satisfy *all*
 relevant bounds. Asymmetric stress shapes are the cheap discriminator;
 add them at the harness level when porting kernels whose contracts have
 this property.
+
+---
+
+## Finding 14 — load-surface partition-axis check closure
+
+Surfaced during the v1 code review and reinforced during the v3 review.
+
+`nl_load_2d_full` and the masked-fancy-load family (`nl_load_fancy_*`)
+asserted `(out partition dim) <= PMAX` on their SBUF return tile. But
+the sliced 2-D and 3-D loads — `nl_load_2d`, `nl_load_3d_slot`,
+`nl_load_3d_at` — did not. Each could in principle materialise an SBUF
+tile whose partition dim exceeded PMAX = 128 when called with a slice
+wider than 128 rows.
+
+**Practical impact on existing targets**: zero. Every ported kernel's
+load-surface site already keeps the partition dim ≤ PMAX (most use it
+exactly = PMAX = 128). The gap was invisible on the corpus.
+
+**Why fix anyway**: the load-surface contract is asymmetric without it.
+`nl_load_2d_full` and friends were strict; the sliced variants were lax.
+A future kernel port (or an adversarial harness) could allocate an
+SBUF tile via the sliced form that would be hardware-invalid yet pass
+verification. Consistent with the Finding 11 spirit (partition-axis
+discipline) and the Finding 13 spirit (close shape-only blind spots
+proactively where the discipline is well-known).
+
+**Resolution**: added one-line assertions to the three sliced load
+stubs:
+
+  - `nl_load_2d`: `assert (r1 - r0) <= PMAX`.
+  - `nl_load_3d_slot`: `assert src.d1 <= PMAX` (the 3-D slot's leading
+    axis becomes the SBUF partition dim).
+  - `nl_load_3d_at`: `assert (r1 - r0) <= PMAX`.
+
+Verified the full 47-target suite still verifies clean after the
+tightening; no existing kernel trips the new check.
+
+**Lesson**: the original `nl_load_2d_full` had the assertion because
+it was written after the full-tile-load semantics were already
+considered carefully. The sliced variants predate that thought and
+inherited the laxer contract. When two stubs in the same family differ
+in their preconditions, the asymmetric weaker one is almost always
+the bug. Sweep symmetrically when adding a new stub in an established
+family.
