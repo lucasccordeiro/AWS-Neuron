@@ -223,14 +223,16 @@ three local conventions:
    `symbolic_type_excp` (parametric), filed as
    [#4541](https://github.com/esbmc/esbmc/issues/4541). Until #4541
    closes, all 62 `slice2d` / `slice_cols` 2-axis call sites stay in
-   place; the higher-arity `slice_3d_at` / `slice_4d_drop_d0_d1` /
-   `slab_cols_*` sites (~86 sites) are gated by
-   [esbmc/esbmc#4542](https://github.com/esbmc/esbmc/issues/4542),
-   filed for heterogeneous-tuple key threading. PR #4544 closed #4541
-   for the single-file case; the cross-module form (class imported
-   from another module) is the actual residual gate, filed as
-   [esbmc/esbmc#4545](https://github.com/esbmc/esbmc/issues/4545).
-   A third related issue
+   place. PR #4544 closed #4541 for the single-file case; PR #4549
+   closed #4542 (heterogeneous-tuple key threading) for the same. The
+   actual residual gate is
+   [esbmc/esbmc#4545](https://github.com/esbmc/esbmc/issues/4545) —
+   any natural-form subscript on a parameter whose class is imported
+   from another module still crashes BMC symex with `symbolic_type_excp`,
+   regardless of whether the tuple is pure-slice or heterogeneous.
+   Every PoC kernel imports `Tile`/`Tile3D`/`Tile4D` from `stubs.py`, so
+   all 148 slice-rewrite call sites (62 two-axis + ~86 higher-arity)
+   stay in place until #4545 closes. A related issue
    ([#4543](https://github.com/esbmc/esbmc/issues/4543)) records the
    `:`-modelled-as-`slice(0, 0)` gap that forces full-axis to be spelled
    `0:t.d0` instead of `:`; orthogonal to the threading concerns but

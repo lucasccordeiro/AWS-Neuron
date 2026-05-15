@@ -77,14 +77,14 @@ asserts the kernel's output contract.
 | `mamba_v3_symbolic` | `mamba_v3_symbolic.py` | `kernels/mamba_v3.py` | `SUCCESSFUL` (`--unwind 5`; STATE ∈ [1, 4], num_seq_tiles ∈ [1, 3]) |
 | `avgpool` | `avgpool.py` | `kernels/avgpool.py` | `SUCCESSFUL` |
 | `avgpool_buggy` | `avgpool_buggy.py` | `kernels/avgpool_buggy.py` | `FAILED` |
-| `avgpool_symbolic` | `avgpool_symbolic.py` | `kernels/avgpool.py` | `SUCCESSFUL` (`--unwind 5 --z3`; H, W ∈ {6, 8, 10}) |
+| `avgpool_symbolic` | `avgpool_symbolic.py` | `kernels/avgpool.py` | `SUCCESSFUL` (`--unwind 5`; H, W ∈ {6, 8, 10}) |
 | `attn_fwd_v1` | `attn_fwd_v1.py` | `kernels/attn_fwd_v1.py` | `SUCCESSFUL` |
 | `attn_fwd_v1_buggy` | `attn_fwd_v1_buggy.py` | `kernels/attn_fwd_v1_buggy.py` | `FAILED` |
 | `attn_fwd_v2` | `attn_fwd_v2.py` | `kernels/attn_fwd_v2.py` | `SUCCESSFUL` |
 | `attn_fwd_v2_buggy` | `attn_fwd_v2_buggy.py` | `kernels/attn_fwd_v2_buggy.py` | `FAILED` |
 | `attn_fwd_v3` | `attn_fwd_v3.py` | `kernels/attn_fwd_v3.py` | `SUCCESSFUL` (`--unwind 5`; seqlen = 512) |
 | `attn_fwd_v3_buggy` | `attn_fwd_v3_buggy.py` | `kernels/attn_fwd_v3_buggy.py` | `FAILED` (`--unwind 5`) |
-| `attn_fwd_v3_symbolic` | `attn_fwd_v3_symbolic.py` | `kernels/attn_fwd_v3.py` | `SUCCESSFUL` (`--unwind 9 --z3`; SEQLEN ∈ {512, 1024}) |
+| `attn_fwd_v3_symbolic` | `attn_fwd_v3_symbolic.py` | `kernels/attn_fwd_v3.py` | `SUCCESSFUL` (`--unwind 9`; SEQLEN ∈ {512, 1024}) |
 | `pipelined_attention` | `pipelined_attention.py` | `kernels/pipelined_attention.py` | `SUCCESSFUL` (shape-skeleton only; inner Flash Attention pipeline deferred — see ROADMAP) |
 
 `verify.py` is the single source of truth for these pairings, the ESBMC

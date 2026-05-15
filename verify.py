@@ -94,14 +94,14 @@ MANIFEST: list[Target] = [
     Target("mamba_v3_symbolic",          "mamba_v3_symbolic.py",                 ("--unwind", "5"), "SUCCESSFUL"),
     Target("avgpool",                    "avgpool.py",                           (),                "SUCCESSFUL"),
     Target("avgpool_buggy",              "avgpool_buggy.py",                     (),                "FAILED"),
-    Target("avgpool_symbolic",           "avgpool_symbolic.py",                  ("--unwind", "5", "--z3"), "SUCCESSFUL"),
+    Target("avgpool_symbolic",           "avgpool_symbolic.py",                  ("--unwind", "5"), "SUCCESSFUL"),
     Target("attn_fwd_v1",                "attn_fwd_v1.py",                       (),                "SUCCESSFUL"),
     Target("attn_fwd_v1_buggy",          "attn_fwd_v1_buggy.py",                 (),                "FAILED"),
     Target("attn_fwd_v2",                "attn_fwd_v2.py",                       (),                "SUCCESSFUL"),
     Target("attn_fwd_v2_buggy",          "attn_fwd_v2_buggy.py",                 (),                "FAILED"),
     Target("attn_fwd_v3",                "attn_fwd_v3.py",                       ("--unwind", "5"), "SUCCESSFUL"),
     Target("attn_fwd_v3_buggy",          "attn_fwd_v3_buggy.py",                 ("--unwind", "5"), "FAILED"),
-    Target("attn_fwd_v3_symbolic",       "attn_fwd_v3_symbolic.py",              ("--unwind", "9", "--z3"), "SUCCESSFUL"),
+    Target("attn_fwd_v3_symbolic",       "attn_fwd_v3_symbolic.py",              ("--unwind", "9"), "SUCCESSFUL"),
     Target("pipelined_attention",        "pipelined_attention.py",               (),                "SUCCESSFUL"),
 ]
 
