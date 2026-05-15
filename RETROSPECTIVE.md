@@ -7,10 +7,11 @@ assumes familiarity with the verifier but not with NKI.
 ## TL;DR
 
 - **18 NKI kernel functions ported** (across 10 upstream source files —
-  6 tutorials, 4 community-`contributed/` kernels), 44 build targets
-  (concrete + positive-control + 6 symbolic-shape variants + 1
+  6 tutorials, 4 community-`contributed/` kernels), 47 build targets
+  (concrete + positive-control + 9 symbolic-shape variants + 1
   historical-bug reproduction), 100 % pass rate against expected
-  verdicts; full regression in about 4 minutes wall-clock on Bitwuzla.
+  verdicts; full regression in about 4 minutes wall-clock on Bitwuzla
+  (`avgpool_symbolic` uses Z3 — see notes).
 - **6 ESBMC Python-frontend issues filed upstream**, 2 already
   fixed-and-merged (#4509, #4510). 4 still open (#4513–#4516).
 - **1 real upstream bug caught retroactively** —

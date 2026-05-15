@@ -62,6 +62,7 @@ asserts the kernel's output contract.
 | `interpolate_trilinear_symbolic` | `interpolate_trilinear_symbolic.py` | `kernels/interpolate_trilinear.py` | `SUCCESSFUL` (`--unwind 5`; D_src, H_src, W_src ∈ {10, 19}) |
 | `matmul_tiled` | `matmul_tiled.py` | `kernels/matmul_tiled.py` | `SUCCESSFUL` |
 | `matmul_tiled_buggy` | `matmul_tiled_buggy.py` | `kernels/matmul_tiled_buggy.py` | `FAILED` |
+| `matmul_tiled_symbolic` | `matmul_tiled_symbolic.py` | `kernels/matmul_tiled.py` | `SUCCESSFUL` (`--unwind 4`; M ∈ {128, 256, 384}, N ∈ {512, 1024}) |
 | `matmul_hoist_load` | `matmul_hoist_load.py` | `kernels/matmul_hoist_load.py` | `SUCCESSFUL` |
 | `matmul_hoist_load_buggy` | `matmul_hoist_load_buggy.py` | `kernels/matmul_hoist_load_buggy.py` | `FAILED` |
 | `matmul_hoist_load_historical` | `matmul_hoist_load_historical.py` | `kernels/matmul_hoist_load_historical.py` | `FAILED` — reproduces the pre-fix bug from upstream [aws-neuron/nki-samples#74](https://github.com/aws-neuron/nki-samples/pull/74) |
@@ -73,8 +74,10 @@ asserts the kernel's output contract.
 | `mamba_v2_buggy` | `mamba_v2_buggy.py` | `kernels/mamba_v2_buggy.py` | `FAILED` |
 | `mamba_v3` | `mamba_v3.py` | `kernels/mamba_v3.py` | `SUCCESSFUL` |
 | `mamba_v3_buggy` | `mamba_v3_buggy.py` | `kernels/mamba_v3_buggy.py` | `FAILED` |
+| `mamba_v3_symbolic` | `mamba_v3_symbolic.py` | `kernels/mamba_v3.py` | `SUCCESSFUL` (`--unwind 5`; STATE ∈ [1, 4], num_seq_tiles ∈ [1, 3]) |
 | `avgpool` | `avgpool.py` | `kernels/avgpool.py` | `SUCCESSFUL` |
 | `avgpool_buggy` | `avgpool_buggy.py` | `kernels/avgpool_buggy.py` | `FAILED` |
+| `avgpool_symbolic` | `avgpool_symbolic.py` | `kernels/avgpool.py` | `SUCCESSFUL` (`--unwind 5 --z3`; H, W ∈ {6, 8, 10}) |
 | `attn_fwd_v1` | `attn_fwd_v1.py` | `kernels/attn_fwd_v1.py` | `SUCCESSFUL` |
 | `attn_fwd_v1_buggy` | `attn_fwd_v1_buggy.py` | `kernels/attn_fwd_v1_buggy.py` | `FAILED` |
 | `attn_fwd_v2` | `attn_fwd_v2.py` | `kernels/attn_fwd_v2.py` | `SUCCESSFUL` |
@@ -97,9 +100,9 @@ python3 verify.py NAME   # run a single target
 ```
 
 Concrete-shape targets complete in 1–3 seconds wall-clock each on a
-stock laptop. The six symbolic-shape targets run for ~5–60 seconds
+stock laptop. The nine symbolic-shape targets run for ~5–60 seconds
 depending on the size of the shape family they sweep. The full suite
-(44 targets) finishes in about 4 minutes wall-clock end-to-end.
+(47 targets) finishes in about 4 minutes wall-clock end-to-end.
 
 ## Where to read more
 
