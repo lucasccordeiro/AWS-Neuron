@@ -22,12 +22,8 @@ def tensor_transpose2D_kernel(in_tensor: Tile, sz_f1: int, sz_f2: int) -> Tile:
 
     for i_f1 in nl_affine_range(sz_f1):
         for i_f2 in nl_affine_range(sz_f2):
-            dst_strip: Tile = slice_cols(out_tile,
-                                         i_f2 * sz_f1 + i_f1,
-                                         i_f2 * sz_f1 + i_f1 + 1)
-            src_strip: Tile = slice_cols(in_tile,
-                                         i_f1 * sz_f2 + i_f2,
-                                         i_f1 * sz_f2 + i_f2 + 1)
+            dst_strip: Tile = out_tile[:, i_f2 * sz_f1 + i_f1:i_f2 * sz_f1 + i_f1 + 1]
+            src_strip: Tile = in_tile[:, i_f1 * sz_f2 + i_f2:i_f1 * sz_f2 + i_f2 + 1]
             nisa_tensor_copy(dst_strip, src_strip)
 
     nisa_dma_copy(out_tensor, out_tile)

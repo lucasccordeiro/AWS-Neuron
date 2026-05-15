@@ -205,39 +205,39 @@ three local conventions:
    identifier per NKI primitive.
 2. **`@nki.jit` decorator stripped.** Trivial — `nki.jit` is an
    unmodelled symbol, not an ESBMC limitation.
-3. **Tile slicing `a[i:j, k:l]` → `slice2d(a, i, j, k, l)`.** The only
-   active *source* rewrite. Successive ESBMC fixes have been chipping
-   at the natural form: conversion-time slice handling
-   ([#4523](https://github.com/esbmc/esbmc/issues/4523)) by
-   [PR #4528](https://github.com/esbmc/esbmc/pull/4528), single-slice
-   propagation into user `__getitem__`
-   ([#4537](https://github.com/esbmc/esbmc/issues/4537)) by
-   [PR #4538](https://github.com/esbmc/esbmc/pull/4538), and tuple-of-
-   slices on locally-constructed instances
-   ([#4539](https://github.com/esbmc/esbmc/issues/4539)) by
-   [PR #4540](https://github.com/esbmc/esbmc/pull/4540). The current
-   residual gate is **parameter-instance receivers**: every PoC kernel
-   takes its `Tile` inputs as parameters and slices them
-   (`a_input[r0:r1, c0:c1]` inside the kernel body), and that pattern
-   still crashes ESBMC at `make_member` (constant slice indices) or
-   `symbolic_type_excp` (parametric), filed as
-   [#4541](https://github.com/esbmc/esbmc/issues/4541). Until #4541
-   closes, all 62 `slice2d` / `slice_cols` 2-axis call sites stay in
-   place. PR #4544 closed #4541 for the single-file case; PR #4549
-   closed #4542 (heterogeneous-tuple key threading); PR #4551 closed
-   #4543 (bare-`:` modelling); PR #4553 closed #4545 (2-file
-   cross-module case). The actual residual gate is the **3-file
-   transitive-import case**
-   ([esbmc/esbmc#4554](https://github.com/esbmc/esbmc/issues/4554)):
-   every PoC harness does `from stubs import *; from kernels.<name>
-   import <kernel>` and the kernel slices its imported-type parameter
-   — that chain still crashes BMC symex with `symbolic_type_excp`. A
-   second blocker for the higher-arity sites is
+3. **Tile slicing `a[i:j, k:l]` → natural Python.** **Retired** as of
+   PR [#4555](https://github.com/esbmc/esbmc/pull/4555) — the ninth
+   and final ESBMC fix in the slice-surface campaign. All 62
+   two-axis call sites now use natural-form subscript
+   `a[r0:r1, c0:c1]` / `a[:, c0:c1]` via `Tile.__getitem__`; the
+   `slice2d` and `slice_cols` free functions are gone from
+   `stubs.py`. The PR chain that unlocked this:
+   [#4522](https://github.com/esbmc/esbmc/pull/4522) (closing
+   [#4514](https://github.com/esbmc/esbmc/issues/4514)),
+   [#4528](https://github.com/esbmc/esbmc/pull/4528) (closing
+   [#4523](https://github.com/esbmc/esbmc/issues/4523)),
+   [#4538](https://github.com/esbmc/esbmc/pull/4538) (closing
+   [#4537](https://github.com/esbmc/esbmc/issues/4537)),
+   [#4540](https://github.com/esbmc/esbmc/pull/4540) (closing
+   [#4539](https://github.com/esbmc/esbmc/issues/4539)),
+   [#4544](https://github.com/esbmc/esbmc/pull/4544) (closing
+   [#4541](https://github.com/esbmc/esbmc/issues/4541)),
+   [#4549](https://github.com/esbmc/esbmc/pull/4549) (closing
+   [#4542](https://github.com/esbmc/esbmc/issues/4542)),
+   [#4551](https://github.com/esbmc/esbmc/pull/4551) (closing
+   [#4543](https://github.com/esbmc/esbmc/issues/4543)),
+   [#4553](https://github.com/esbmc/esbmc/pull/4553) (closing
+   [#4545](https://github.com/esbmc/esbmc/issues/4545)), and
+   [#4555](https://github.com/esbmc/esbmc/pull/4555) (closing
+   [#4554](https://github.com/esbmc/esbmc/issues/4554)).
+   The higher-arity slice forms (`slice_3d_at`,
+   `slice_4d_drop_d0_d1`, `slab_cols_get`/`_set`) remain wrapped as
+   free-function calls, gated by
    [esbmc/esbmc#4552](https://github.com/esbmc/esbmc/issues/4552) —
-   two cross-module classes with `__getitem__` at different subscript
-   arities crash with `type mismatch: got pointer, expected struct`.
-   Both blockers must close for all 148 slice-rewrite call sites to
-   retire (62 two-axis + ~86 higher-arity).
+   two cross-module classes with `__getitem__` at different
+   subscript arities crash with `type mismatch: got pointer,
+   expected struct`. Closing #4552 retires the remaining ~86
+   higher-arity sites.
 
 For-loops are native (`for m in nl_affine_range(N):`); tuple
 destructuring is native (`M, N = a.shape`); the `nl_affine_range`

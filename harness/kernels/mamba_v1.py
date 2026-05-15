@@ -38,10 +38,7 @@ def mamba_v1(delta: Tile3D, u: Tile3D, A: Tile, B: Tile3D, C: Tile3D) -> Tile3D:
                                               delta.dtype, BUF_SBUF)
                 nisa_dma_copy(delta_i, delta_slice)
 
-                A_slice: Tile = slice2d(A,
-                                        channel_start,
-                                        channel_start + channel_psize,
-                                        i_state, i_state + 1)
+                A_slice: Tile = A[channel_start:channel_start + channel_psize, i_state:i_state + 1]
                 A_i: Tile = nl_ndarray_2d(channel_psize, 1, A.dtype, BUF_SBUF)
                 nisa_dma_copy(A_i, A_slice)
 
