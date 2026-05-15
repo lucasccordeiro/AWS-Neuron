@@ -7,10 +7,11 @@
 #
 # Solver note: Bitwuzla 0.8.2 raises
 #   "term with unexpected sort at index 0"
-# while encoding the VCCs for this target (the kernel's tile3d_ap_5d
-# max-offset arithmetic becomes symbolic when H/W are nondet). Z3 verifies
-# in ~5 seconds. The verify.py manifest pins --z3 for this target only;
-# everything else still uses the default Bitwuzla.
+# while encoding the VCCs for this target. Z3 verifies in ~5 seconds.
+# The trigger is narrow — floor-division of a nondet passed as a function
+# argument — and is filed upstream as esbmc/esbmc#4548 with a 6-line
+# minimal reproducer. The verify.py manifest pins --z3 for this target
+# only; everything else still uses the default Bitwuzla.
 
 from stubs import *
 from kernels.avgpool import tensor_avgpool_kernel
