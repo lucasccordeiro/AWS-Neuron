@@ -7,8 +7,8 @@ assumes familiarity with the verifier but not with NKI.
 ## TL;DR
 
 - **18 NKI kernel functions ported** (across 10 upstream source files —
-  6 tutorials, 4 community-`contributed/` kernels), 43 build targets
-  (concrete + positive-control + 5 symbolic-shape variants + 1
+  6 tutorials, 4 community-`contributed/` kernels), 44 build targets
+  (concrete + positive-control + 6 symbolic-shape variants + 1
   historical-bug reproduction), 100 % pass rate against expected
   verdicts; full regression in about 4 minutes wall-clock on Bitwuzla.
 - **6 ESBMC Python-frontend issues filed upstream**, 2 already
@@ -63,7 +63,7 @@ filed ESBMC issue (#4514–#4516).
 | `contributed/matmul.py` | community | good (two sizes) + buggy |
 | `contributed/maxpooling.py` | community | good + buggy + symbolic-shape |
 | `contributed/interpolate_bilinear_fwd.py` | community | good + buggy + symbolic-shape |
-| `contributed/interpolate_trilinear_fwd.py` | community | good + buggy |
+| `contributed/interpolate_trilinear_fwd.py` | community | good + buggy + symbolic-shape (8 combos over D×H×W ∈ {10, 19}³) |
 | `contributed/pipelined_attention.py` | community | deferred (attention-specific primitives) |
 | `tutorials/{mxfp-matmul, attention_fwd_performance}` | tutorials | not attempted |
 
