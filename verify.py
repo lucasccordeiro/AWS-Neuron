@@ -102,6 +102,7 @@ MANIFEST: list[Target] = [
     Target("attn_fwd_v3",                "attn_fwd_v3.py",                       ("--unwind", "5"), "SUCCESSFUL"),
     Target("attn_fwd_v3_buggy",          "attn_fwd_v3_buggy.py",                 ("--unwind", "5"), "FAILED"),
     Target("attn_fwd_v3_symbolic",       "attn_fwd_v3_symbolic.py",              ("--unwind", "9", "--z3"), "SUCCESSFUL"),
+    Target("pipelined_attention",        "pipelined_attention.py",               (),                "SUCCESSFUL"),
 ]
 
 
