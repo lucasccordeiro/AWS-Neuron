@@ -68,9 +68,7 @@ def nki_matmul_block_free(lhsT: Tile, rhs: Tile) -> Tile:
 
                     m_idx2: int = m * TILES_IN_BLOCK_M + bm
                     n_idx2: int = n * TILES_IN_BLOCK_N + bn
-                    nisa_dma_copy(slice2d(result,
-                                          m_idx2*TILE_M, (m_idx2+1)*TILE_M,
-                                          n_idx2*TILE_N, (n_idx2+1)*TILE_N),
+                    nisa_dma_copy(result[m_idx2*TILE_M:(m_idx2+1)*TILE_M, n_idx2*TILE_N:(n_idx2+1)*TILE_N],
                                   res_tmp)
 
     return result

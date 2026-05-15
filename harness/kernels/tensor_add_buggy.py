@@ -25,17 +25,14 @@ def nki_tensor_add(a_input: Tile, b_input: Tile) -> Tile:
 
             # BUG: off-by-one on the row-end of a_input slice
             nisa_dma_copy(a_tile,
-                          slice2d(a_input, m*TILE_M, (m+2)*TILE_M,
-                                           n*TILE_N, (n+1)*TILE_N))
+                          a_input[m*TILE_M:(m+2)*TILE_M, n*TILE_N:(n+1)*TILE_N])
             nisa_dma_copy(b_tile,
-                          slice2d(b_input, m*TILE_M, (m+1)*TILE_M,
-                                           n*TILE_N, (n+1)*TILE_N))
+                          b_input[m*TILE_M:(m+1)*TILE_M, n*TILE_N:(n+1)*TILE_N])
 
             c_tile: Tile = nl_ndarray_2d(TILE_M, TILE_N, a_input.dtype, BUF_SBUF)
             nisa_tensor_tensor(c_tile, a_tile, b_tile)
 
-            nisa_dma_copy(slice2d(c_output, m*TILE_M, (m+1)*TILE_M,
-                                            n*TILE_N, (n+1)*TILE_N),
+            nisa_dma_copy(c_output[m*TILE_M:(m+1)*TILE_M, n*TILE_N:(n+1)*TILE_N],
                           c_tile)
 
     return c_output

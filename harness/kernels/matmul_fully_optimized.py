@@ -88,13 +88,12 @@ def nki_matmul_fully_optimized(lhsT: Tile, rhs: Tile,
                 for bn in nl_affine_range(TILES_IN_BLOCK_N):
                     slot3: int = (m * TILES_IN_BLOCK_M + bm) * TILES_IN_BLOCK_N + bn
                     nisa_tensor_copy(
-                        slice_cols(result_packed, bn*TILE_N, (bn+1)*TILE_N),
+                        result_packed[:, bn*TILE_N:(bn+1)*TILE_N],
                         slab_get(result_tmps, slot3))
 
                 m_idx_out: int = TILES_IN_BLOCK_M * m + bm
                 nisa_dma_copy(
-                    slice2d(result, m_idx_out*TILE_M, (m_idx_out+1)*TILE_M,
-                                    BLOCK_N*n, BLOCK_N*(n+1)),
+                    result[m_idx_out*TILE_M:(m_idx_out+1)*TILE_M, BLOCK_N*n:BLOCK_N*(n+1)],
                     result_packed)
 
     return result

@@ -51,8 +51,7 @@ def nki_matmul_hoist_load(lhsT: Tile, rhs: Tile) -> Tile:
             res_sb: Tile = nl_ndarray_2d(TILE_M, TILE_N, result.dtype, BUF_SBUF)
             nisa_tensor_copy(res_sb, res_psum)
 
-            nisa_dma_copy(slice2d(result, m*TILE_M, (m+1)*TILE_M,
-                                          n*TILE_N, (n+1)*TILE_N),
+            nisa_dma_copy(result[m*TILE_M:(m+1)*TILE_M, n*TILE_N:(n+1)*TILE_N],
                           res_sb)
 
     return result

@@ -20,6 +20,28 @@ class Tile:
         self.dtype: int = dtype
         self.buffer: int = buffer
 
+    def __getitem__(self, key) -> "Tile":
+        """2-D rectangular slice `t[r0:r1, c0:c1]` or column-strip `t[:, c0:c1]`.
+
+        Either axis may be a bare `:` — `sl.start` / `sl.stop` are then
+        `None` (per esbmc/esbmc#4551), and the full-axis range
+        `[0, self.d{0,1})` is used. Returns a Tile view inheriting dtype
+        and buffer; asserts in-bounds for both axes.
+        """
+        sl0: slice = key[0]
+        sl1: slice = key[1]
+        r0: int = sl0.start if sl0.start is not None else 0
+        r1: int = sl0.stop  if sl0.stop  is not None else self.d0
+        c0: int = sl1.start if sl1.start is not None else 0
+        c1: int = sl1.stop  if sl1.stop  is not None else self.d1
+        assert 0 <= r0
+        assert r0 <= r1
+        assert r1 <= self.d0
+        assert 0 <= c0
+        assert c0 <= c1
+        assert c1 <= self.d1
+        return Tile(r1 - r0, c1 - c0, self.dtype, self.buffer)
+
 class Tile3D:
     """Rank-3 tile: shape (d0, d1, d2). For matmul-style (slabs, par_dim, free) layouts."""
     def __init__(self, d0: int, d1: int, d2: int, dtype: int, buffer: int):
@@ -115,25 +137,6 @@ def nl_ndarray_3d(d0: int, d1: int, d2: int, dtype: int, buffer: int) -> Tile3D:
 
 def nl_zeros_3d(d0: int, d1: int, d2: int, dtype: int, buffer: int) -> Tile3D:
     return nl_ndarray_3d(d0, d1, d2, dtype, buffer)
-
-# ============================================================== Slicing (view-style)
-
-# tile[r0:r1, c0:c1] — 2-D rectangular slice. Returns a shape-only view.
-def slice2d(src: Tile, r0: int, r1: int, c0: int, c1: int) -> Tile:
-    assert 0 <= r0
-    assert r0 <= r1
-    assert r1 <= src.d0
-    assert 0 <= c0
-    assert c0 <= c1
-    assert c1 <= src.d1
-    return Tile(r1 - r0, c1 - c0, src.dtype, src.buffer)
-
-# tile[:, c0:c1] — column-strip slice. Models out[:, nl.ds(start, size)].
-def slice_cols(src: Tile, c0: int, c1: int) -> Tile:
-    assert 0 <= c0
-    assert c0 <= c1
-    assert c1 <= src.d1
-    return Tile(src.d0, c1 - c0, src.dtype, src.buffer)
 
 # ============================================================== Load / store (implicit-slice)
 

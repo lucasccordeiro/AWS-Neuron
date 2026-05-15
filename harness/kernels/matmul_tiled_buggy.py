@@ -31,19 +31,16 @@ def nki_matmul_tiled(lhsT: Tile, rhs: Tile) -> Tile:
 
                 # BUG: K-end of the lhsT slice is (k+2)*TILE_K instead of (k+1).
                 nisa_dma_copy(lhsT_tile,
-                              slice2d(lhsT, k*TILE_K, (k+2)*TILE_K,
-                                            m*TILE_M, (m+1)*TILE_M))
+                              lhsT[k*TILE_K:(k+2)*TILE_K, m*TILE_M:(m+1)*TILE_M])
                 nisa_dma_copy(rhs_tile,
-                              slice2d(rhs,  k*TILE_K, (k+1)*TILE_K,
-                                            n*TILE_N, (n+1)*TILE_N))
+                              rhs[k*TILE_K:(k+1)*TILE_K, n*TILE_N:(n+1)*TILE_N])
 
                 nisa_nc_matmul(res_psum, lhsT_tile, rhs_tile)
 
             res_sb: Tile = nl_ndarray_2d(TILE_M, TILE_N, result.dtype, BUF_SBUF)
             nisa_tensor_copy(res_sb, res_psum)
 
-            nisa_dma_copy(slice2d(result, m*TILE_M, (m+1)*TILE_M,
-                                          n*TILE_N, (n+1)*TILE_N),
+            nisa_dma_copy(result[m*TILE_M:(m+1)*TILE_M, n*TILE_N:(n+1)*TILE_N],
                           res_sb)
 
     return result

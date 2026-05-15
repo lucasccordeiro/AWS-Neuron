@@ -49,10 +49,7 @@ def mamba_v3(delta: Tile3D, u: Tile3D, A: Tile, B: Tile3D, C: Tile3D,
             nisa_dma_copy(u_i, u_slice)
 
             for i_state in nl_affine_range(state_size):
-                A_slice: Tile = slice2d(A,
-                                        channel_start,
-                                        channel_start + channel_psize,
-                                        i_state, i_state + 1)
+                A_slice: Tile = A[channel_start:channel_start + channel_psize, i_state:i_state + 1]
                 A_i: Tile = nl_ndarray_2d(channel_psize, 1, A.dtype, BUF_SBUF)
                 nisa_dma_copy(A_i, A_slice)
 
@@ -66,7 +63,7 @@ def mamba_v3(delta: Tile3D, u: Tile3D, A: Tile, B: Tile3D, C: Tile3D,
                     deltaA: Tile = nl_ndarray_2d(channel_psize, seq_len_fsize,
                                                  delta.dtype, BUF_SBUF)
                     nisa_activation(deltaA,
-                                    slice_cols(delta_i, seq_len_start, seq_len_end),
+                                    delta_i[:, seq_len_start:seq_len_end],
                                     A_i)
 
                     B_slice: Tile = slice_3d_at(B, i_batch,
@@ -78,8 +75,8 @@ def mamba_v3(delta: Tile3D, u: Tile3D, A: Tile, B: Tile3D, C: Tile3D,
                     deltaU: Tile = nl_ndarray_2d(channel_psize, seq_len_fsize,
                                                  delta.dtype, BUF_SBUF)
                     nisa_tensor_tensor(deltaU,
-                                       slice_cols(delta_i, seq_len_start, seq_len_end),
-                                       slice_cols(u_i,     seq_len_start, seq_len_end))
+                                       delta_i[:, seq_len_start:seq_len_end],
+                                       u_i[:, seq_len_start:seq_len_end])
 
                     B_i_bcast: Tile = nl_broadcast_to(B_i, channel_psize, seq_len_fsize)
                     deltaBu: Tile = nl_ndarray_2d(channel_psize, seq_len_fsize,
@@ -90,8 +87,7 @@ def mamba_v3(delta: Tile3D, u: Tile3D, A: Tile, B: Tile3D, C: Tile3D,
                                                    delta.dtype, BUF_SBUF)
                     nisa_tensor_tensor_scan(scan_res, deltaA, deltaBu)
                     nisa_tensor_copy(scan_init,
-                                     slice_cols(scan_res,
-                                                seq_len_fsize - 1, seq_len_fsize))
+                                     scan_res[:, seq_len_fsize - 1:seq_len_fsize])
 
                     C_slice: Tile = slice_3d_at(C, i_batch,
                                                 i_state, i_state + 1,
@@ -104,8 +100,8 @@ def mamba_v3(delta: Tile3D, u: Tile3D, A: Tile, B: Tile3D, C: Tile3D,
                                                 delta.dtype, BUF_SBUF)
                     nisa_tensor_tensor(scanC, scan_res, C_i_bcast)
 
-                    nisa_tensor_tensor(slice_cols(scanC_accum, seq_len_start, seq_len_end),
-                                       slice_cols(scanC_accum, seq_len_start, seq_len_end),
+                    nisa_tensor_tensor(scanC_accum[:, seq_len_start:seq_len_end],
+                                       scanC_accum[:, seq_len_start:seq_len_end],
                                        scanC)
 
             out_slice: Tile = slice_3d_at(output, i_batch,
