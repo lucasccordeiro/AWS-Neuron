@@ -66,6 +66,8 @@ asserts the kernel's output contract.
 | `interpolate_bilinear_buggy` | `interpolate_bilinear_buggy.py` | `kernels/interpolate_bilinear_buggy.py` | `FAILED` |
 | `interpolate_trilinear` | `interpolate_trilinear.py` | `kernels/interpolate_trilinear.py` | `SUCCESSFUL` |
 | `interpolate_trilinear_buggy` | `interpolate_trilinear_buggy.py` | `kernels/interpolate_trilinear_buggy.py` | `FAILED` |
+| `interpolate_bilinear_chunk1` | `interpolate_bilinear_chunk1.py` | `kernels/interpolate_bilinear.py` | `FAILED` — chunk_size=1 boundary input (AUDIT Finding 15) |
+| `interpolate_trilinear_chunk1` | `interpolate_trilinear_chunk1.py` | `kernels/interpolate_trilinear.py` | `FAILED` — same boundary as bilinear |
 | `matmul_basic` | `matmul_basic.py` | `kernels/matmul_basic.py` | `SUCCESSFUL` |
 | `matmul_basic_buggy` | `matmul_basic_buggy.py` | `kernels/matmul_basic_buggy.py` | `FAILED` |
 | `mamba_v1` | `mamba_v1.py` | `kernels/mamba_v1.py` | `SUCCESSFUL` |
@@ -126,7 +128,7 @@ locally after `make dashboard` to see the current state of the PoC.
 Concrete-shape targets complete in 1–3 seconds wall-clock each on a
 stock laptop. The ten symbolic-shape targets run for ~5–90 seconds
 depending on the size of the shape family they sweep. The full suite
-(49 targets) finishes in about 5 minutes wall-clock end-to-end.
+(51 targets) finishes in about 5 minutes wall-clock end-to-end.
 
 ## Where to read more
 
