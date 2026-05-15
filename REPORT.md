@@ -224,8 +224,13 @@ three local conventions:
    [#4541](https://github.com/esbmc/esbmc/issues/4541). Until #4541
    closes, all 62 `slice2d` / `slice_cols` 2-axis call sites stay in
    place; the higher-arity `slice_3d_at` / `slice_4d_drop_d0_d1` /
-   `slab_cols_*` sites need additional support for mixed scalar+slice
-   tuples, which neither #4540 nor #4541 covers.
+   `slab_cols_*` sites (~86 sites) are gated by
+   [esbmc/esbmc#4542](https://github.com/esbmc/esbmc/issues/4542),
+   filed for heterogeneous-tuple key threading. A third related issue
+   ([#4543](https://github.com/esbmc/esbmc/issues/4543)) records the
+   `:`-modelled-as-`slice(0, 0)` gap that forces full-axis to be spelled
+   `0:t.d0` instead of `:`; orthogonal to the threading concerns but
+   visible from the same surface.
 
 For-loops are native (`for m in nl_affine_range(N):`); tuple
 destructuring is native (`M, N = a.shape`); the `nl_affine_range`
