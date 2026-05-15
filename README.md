@@ -99,7 +99,14 @@ is in `RETROSPECTIVE.md`.
 ```bash
 make verify              # run ESBMC on every target, tally results
 python3 verify.py NAME   # run a single target
+make dashboard           # rebuild dashboard.html from current data
 ```
+
+[`dashboard.html`](dashboard.html) is a single self-contained HTML page
+that pulls live data from `verify.py` and `RETROSPECTIVE.md` — headline
+stats, all targets with kind/family/flags, every ESBMC issue filed with
+its status, kernel coverage tree, and source-rewriting status. Open it
+locally after `make dashboard` to see the current state of the PoC.
 
 Concrete-shape targets complete in 1–3 seconds wall-clock each on a
 stock laptop. The ten symbolic-shape targets run for ~5–90 seconds
