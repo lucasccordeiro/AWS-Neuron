@@ -231,13 +231,17 @@ three local conventions:
    [#4555](https://github.com/esbmc/esbmc/pull/4555) (closing
    [#4554](https://github.com/esbmc/esbmc/issues/4554)).
    The higher-arity slice forms (`slice_3d_at`,
-   `slice_4d_drop_d0_d1`, `slab_cols_get`/`_set`) remain wrapped as
-   free-function calls, gated by
-   [esbmc/esbmc#4552](https://github.com/esbmc/esbmc/issues/4552) —
-   two cross-module classes with `__getitem__` at different
-   subscript arities crash with `type mismatch: got pointer,
-   expected struct`. Closing #4552 retires the remaining ~86
-   higher-arity sites.
+   `slice_4d_drop_d0_d1`, `slab_get`/`_set`,
+   `slab_cols_get`/`_set`) remain wrapped as free-function calls
+   across ~86 sites. PR #4557 closed #4552 (two cross-module classes
+   with `__getitem__` at different arities) — the residual blocker is
+   [esbmc/esbmc#4558](https://github.com/esbmc/esbmc/issues/4558):
+   when the first scalar element of a tuple-key of arity ≥ 3 is a
+   *variable* (loop index, parameter, local) rather than a literal,
+   the imported-class `__getitem__` still crashes (`symbolic_type_excp`
+   for Tile3D, `dereference failure: Incorrect alignment` for Tile4D).
+   Every PoC higher-arity site uses a loop variable as the scalar
+   axis, so closing #4558 retires all ~86 of them.
 
 For-loops are native (`for m in nl_affine_range(N):`); tuple
 destructuring is native (`M, N = a.shape`); the `nl_affine_range`
