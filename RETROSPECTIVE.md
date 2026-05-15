@@ -7,11 +7,12 @@ assumes familiarity with the verifier but not with NKI.
 ## TL;DR
 
 - **18 NKI kernel functions ported** (across 10 upstream source files —
-  6 tutorials, 4 community-`contributed/` kernels), 47 build targets
-  (concrete + positive-control + 9 symbolic-shape variants + 1
+  6 tutorials, 4 community-`contributed/` kernels), 48 build targets
+  (concrete + positive-control + 10 symbolic-shape variants + 1
   historical-bug reproduction), 100 % pass rate against expected
-  verdicts; full regression in about 4 minutes wall-clock on Bitwuzla
-  (`avgpool_symbolic` uses Z3 — see notes).
+  verdicts; full regression in about 5 minutes wall-clock on Bitwuzla
+  (`avgpool_symbolic` and `attn_fwd_v3_symbolic` use Z3 to dodge
+  esbmc/esbmc#4548).
 - **6 ESBMC Python-frontend issues filed upstream**, 2 already
   fixed-and-merged (#4509, #4510). 4 still open (#4513–#4516).
 - **1 real upstream bug caught retroactively** —
@@ -122,7 +123,7 @@ Catalogued at a glance to show breadth:
 | [#4539](https://github.com/esbmc/esbmc/issues/4539) | **RESOLVED** ([PR #4540](https://github.com/esbmc/esbmc/pull/4540)) | tuple-of-slices `a[i:j, k:l]` doesn't populate the tuple's backing list in `__getitem__`'s `key` parameter | simple-case repro now SUCCESSFUL; parameter-instance receivers crash separately, filed as follow-on [#4541](https://github.com/esbmc/esbmc/issues/4541) |
 | [#4541](https://github.com/esbmc/esbmc/issues/4541) | **RESOLVED** ([PR #4544](https://github.com/esbmc/esbmc/pull/4544)) | `__getitem__` on a function-parameter instance crashes (`make_member` assertion / `symbolic_type_excp`) | the single-file form now verifies; cross-module form (class imported from another module) still crashes, filed as follow-on [#4545](https://github.com/esbmc/esbmc/issues/4545) |
 | [#4545](https://github.com/esbmc/esbmc/issues/4545) | OPEN | `__getitem__` on a parameter whose class is imported from another module crashes at BMC symex (`symbolic_type_excp`) | every PoC kernel imports `Tile` from `stubs.py` — keeps `slice2d` / `slice_cols` in place across all 62 two-axis call sites |
-| [#4548](https://github.com/esbmc/esbmc/issues/4548) | OPEN | Bitwuzla sort-mismatch encoding floor-div of `nondet_int()` in a function-call argument (6-line repro; Z3 verifies the same program SUCCESSFUL) | forces `verify.py` to pin `--z3` for `avgpool_symbolic`; the `attn_fwd_v3_symbolic` target held over from the original Tier-3 symbolic batch is blocked on the same bug |
+| [#4548](https://github.com/esbmc/esbmc/issues/4548) | OPEN | Bitwuzla sort-mismatch encoding floor-div of `nondet_int()` in a function-call argument (6-line repro; Z3 verifies the same program SUCCESSFUL) | forces `verify.py` to pin `--z3` for two targets (`avgpool_symbolic`, `attn_fwd_v3_symbolic`) |
 | [#4542](https://github.com/esbmc/esbmc/issues/4542) | OPEN | heterogeneous-tuple `__getitem__` key elements don't thread — mix of scalars and slices, including pure-scalar tuples, fails to install per-element values into `key` | keeps the higher-arity rewrites (`slice_3d_at`, `slice_4d_drop_d0_d1`, `slab_cols_get`/`_set`) in place across ~86 call sites |
 | [#4543](https://github.com/esbmc/esbmc/issues/4543) | OPEN | bare `:` slice modelled as `slice(0, 0)`, indistinguishable from explicit `0:0` empty slice (Python semantics: `slice(None, None, None)`) | forces callers to spell full-axis as `t[0:t.d0, ...]` instead of upstream NKI's natural `t[:, ...]`; surfaced during the #4540 / #4541 testing |
 | [#4515](https://github.com/esbmc/esbmc/issues/4515) | **RESOLVED** ([PR #4524](https://github.com/esbmc/esbmc/pull/4524)) | tuple unpack fails when source is class attribute or `tuple`-typed parameter | retired in 6 kernels; interpolate kernels gated by follow-on [#4532](https://github.com/esbmc/esbmc/issues/4532) |
