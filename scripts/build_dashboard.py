@@ -88,6 +88,14 @@ def family_kind(family: str) -> str:
 
 
 @dataclass(frozen=True)
+class RoadmapRow:
+    milestone: str
+    targets: str       # the cell as written ("~51", "34", etc.)
+    status: str        # short form: "DONE" or "pending" or "deferred"
+    raw_status: str    # the original markdown cell for the note column
+
+
+@dataclass(frozen=True)
 class RewriteRow:
     form: str         # original NKI syntax
     workaround: str   # what the PoC writes instead
@@ -119,6 +127,37 @@ def parse_rewrites_table(retrospective_md: str) -> list[RewriteRow]:
             form_cell, earlier_form, retired_by = cells[:3]
             status = "active" if "(active)" in retired_by else "retired"
             rows.append(RewriteRow(form_cell, earlier_form, status, retired_by))
+    return rows
+
+
+def parse_roadmap_table(roadmap_md: str) -> list[RoadmapRow]:
+    """Pull rows from ROADMAP.md's 'End-state estimates' table."""
+    section = roadmap_md.split("## End-state estimates", 1)
+    if len(section) < 2:
+        return []
+    body = section[1].split("\n## ", 1)[0]
+    in_table = False
+    rows: list[RoadmapRow] = []
+    for line in body.splitlines():
+        if line.startswith("| Through |"):
+            in_table = True
+            continue
+        if in_table and line.startswith("|---"):
+            continue
+        if in_table and not line.startswith("|"):
+            break
+        if in_table and line.startswith("|"):
+            cells = [c.strip() for c in line.split("|")[1:-1]]
+            if len(cells) < 3:
+                continue
+            milestone, targets, status_cell = cells[:3]
+            if "DONE" in status_cell:
+                short = "DONE"
+            elif "deferred" in status_cell.lower():
+                short = "deferred"
+            else:
+                short = "pending"
+            rows.append(RoadmapRow(milestone, targets, short, status_cell))
     return rows
 
 
@@ -154,16 +193,21 @@ def parse_issues_table(retrospective_md: str) -> list[IssueRow]:
 def render_markdown_cell(text: str) -> str:
     """Convert simple Markdown to inline HTML for a table cell.
 
-    Handles `[label](url)` → `<a href="url">label</a>` and backtick-escaped
-    `code` → `<code>code</code>`. HTML-escapes everything else.
+    Handles `[label](url)` → `<a href="url">label</a>`, backtick-escaped
+    `code` → `<code>code</code>`, and `**bold**` → `<strong>bold</strong>`.
+    HTML-escapes everything else.
     """
     parts: list[str] = []
     pos = 0
-    pattern = re.compile(r"\[([^\]]+)\]\(([^)]+)\)|`([^`]+)`")
+    pattern = re.compile(
+        r"\[([^\]]+)\]\(([^)]+)\)|`([^`]+)`|\*\*([^*]+)\*\*"
+    )
     for m in pattern.finditer(text):
         parts.append(html.escape(text[pos:m.start()]))
         if m.group(3) is not None:
             parts.append(f"<code>{html.escape(m.group(3))}</code>")
+        elif m.group(4) is not None:
+            parts.append(f"<strong>{html.escape(m.group(4))}</strong>")
         else:
             label, url = m.group(1), m.group(2)
             parts.append(
@@ -175,7 +219,8 @@ def render_markdown_cell(text: str) -> str:
 
 
 def render_html(manifest, issues: list[IssueRow],
-                rewrites: list[RewriteRow]) -> str:
+                rewrites: list[RewriteRow],
+                roadmap: list[RoadmapRow]) -> str:
     """Render the full dashboard as a single HTML string."""
     targets_by_kind: dict[str, int] = {}
     targets_by_family: dict[str, list] = {}
@@ -360,6 +405,59 @@ def render_html(manifest, issues: list[IssueRow],
         + '</tbody></table>'
     )
 
+    # ---- Roadmap: remaining + pending work
+    n_done    = sum(1 for r in roadmap if r.status == "DONE")
+    n_pending = sum(1 for r in roadmap if r.status == "pending")
+    roadmap_rows: list[str] = []
+    for r in roadmap:
+        status_class = {
+            "DONE":     '<span class="status RESOLVED">DONE</span>',
+            "pending":  '<span class="status OPEN">PENDING</span>',
+            "deferred": '<span class="kind skeleton">DEFERRED</span>',
+        }[r.status]
+        roadmap_rows.append(
+            f'<tr>'
+            f'<td>{render_markdown_cell(r.milestone)}</td>'
+            f'<td><code class="small">{html.escape(r.targets)}</code></td>'
+            f'<td>{status_class}</td>'
+            f'<td>{render_markdown_cell(r.raw_status)}</td>'
+            f'</tr>'
+        )
+    roadmap_table = (
+        '<table><thead><tr>'
+        '<th>Milestone</th><th>Targets</th><th>Status</th><th>Notes</th>'
+        '</tr></thead><tbody>'
+        + "\n".join(roadmap_rows)
+        + '</tbody></table>'
+    )
+
+    # ---- Source-fidelity work: open ESBMC issues with PoC impact
+    open_only = [i for i in issues if i.status == "OPEN"]
+    if open_only:
+        open_rows = []
+        for i in open_only:
+            url = f"https://github.com/esbmc/esbmc/issues/{i.number}"
+            open_rows.append(
+                f'<tr>'
+                f'<td><a href="{url}">#{i.number}</a></td>'
+                f'<td>{render_markdown_cell(i.title)}</td>'
+                f'<td>{render_markdown_cell(i.impact)}</td>'
+                f'</tr>'
+            )
+        open_issues_html = (
+            '<p class="small" style="margin-top: 0;">These ESBMC issues '
+            'are the path-of-record blockers for retiring the remaining '
+            'PoC workarounds. Closing them unlocks the corresponding '
+            'source-fidelity work without any new modelling.</p>'
+            '<table><thead><tr>'
+            '<th>Issue</th><th>What</th><th>PoC impact</th>'
+            '</tr></thead><tbody>'
+            + "\n".join(open_rows)
+            + '</tbody></table>'
+        )
+    else:
+        open_issues_html = '<p class="small">No open ESBMC issues — every filed gap is closed upstream.</p>'
+
     today = date.today().isoformat()
 
     return f"""<!DOCTYPE html>
@@ -401,6 +499,16 @@ def render_html(manifest, issues: list[IssueRow],
   <div>{rewrites_html}</div>
 </section>
 
+<section>
+  <h2>Remaining work — kernel coverage ({n_done} milestones done · {n_pending} pending)</h2>
+  <div>{roadmap_table}</div>
+</section>
+
+<section>
+  <h2>Remaining work — source-fidelity blockers ({len(open_only)} open)</h2>
+  <div>{open_issues_html}</div>
+</section>
+
 </main>
 </body>
 </html>
@@ -408,15 +516,17 @@ def render_html(manifest, issues: list[IssueRow],
 
 
 def main() -> int:
-    """Read manifest + issues + rewrites, write dashboard.html at repo root."""
+    """Read manifest + issues + rewrites + roadmap, write dashboard.html at repo root."""
     retrospective = (ROOT / "RETROSPECTIVE.md").read_text()
+    roadmap_md = (ROOT / "ROADMAP.md").read_text()
     issues = parse_issues_table(retrospective)
     rewrites = parse_rewrites_table(retrospective)
-    output = render_html(verify.MANIFEST, issues, rewrites)
+    roadmap = parse_roadmap_table(roadmap_md)
+    output = render_html(verify.MANIFEST, issues, rewrites, roadmap)
     (ROOT / "dashboard.html").write_text(output)
     print(f"wrote {ROOT / 'dashboard.html'} "
           f"({len(verify.MANIFEST)} targets, {len(issues)} issues, "
-          f"{len(rewrites)} rewrites)")
+          f"{len(rewrites)} rewrites, {len(roadmap)} roadmap rows)")
     return 0
 
 
