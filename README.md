@@ -11,6 +11,21 @@ kernel call (partition-dim limits, in-bounds slicing, shape-equality on
 DMA / elementwise / matmul, hardware constraints on the matmul unit) and
 catches contract violations with precise counterexamples.
 
+## What this looks like in practice
+
+The PoC reproduces a real shipped bug from
+[aws-neuron/nki-samples PR #74](https://github.com/aws-neuron/nki-samples/pull/74)
+("matmul sbuf allocation dimension fix"). The pre-PR `nki_matmul_hoist_load_`
+allocated `lhsT_tiles` with free-dim `TILE_N` (=512) when it should have been
+`TILE_M` (=128). ESBMC catches the resulting shape mismatch retroactively, in
+about two seconds on a laptop:
+
+![Real upstream bug caught by ESBMC in 2 seconds](figures/bug_pr74.png)
+
+(The figure regenerates from
+[`figures/bug_pr74.html`](figures/bug_pr74.html) — open it in a browser
+for the same rendering at any zoom level.)
+
 ## Layout
 
 ```
