@@ -100,7 +100,7 @@ for one, conditionally for the other":
 - **Verification soundness (ESBMC's BMC).** Given the stub contracts
   as the ground truth, ESBMC's bounded model checking is sound up to
   the unwinding bound: every path of length ≤ the bound is explored.
-  Nine of our targets are explicitly symbolic and use `--unwind` to
+  Ten of our targets are explicitly symbolic and use `--unwind` to
   bound the family they sweep; the rest use concrete shapes and finite
   loops where unwinding is exhaustive. The verifier never says
   `SUCCESSFUL` on a path it has not in fact explored.
@@ -347,11 +347,12 @@ break the symmetry naturally.
 
 ## What still does not work
 
-- **Most targets use concrete shapes.** Nine symbolic-shape targets
+- **Most targets use concrete shapes.** Ten symbolic-shape targets
   exist (`tensor_add_symbolic`, `transpose2d_symbolic`,
   `maxpooling_symbolic`, `mamba_v1_symbolic`,
   `interpolate_bilinear_symbolic`, `interpolate_trilinear_symbolic`,
-  `avgpool_symbolic`, `mamba_v3_symbolic`, `matmul_tiled_symbolic`)
+  `avgpool_symbolic`, `mamba_v3_symbolic`, `matmul_tiled_symbolic`,
+  `attn_fwd_v3_symbolic`)
   — each sweeps a small bounded family of legal shapes via
   `nondet_int` + `__ESBMC_assume` and verifies under `--unwind 5` or 6.
   The `matmul` family is not symbolicised: matmul has six nested loops
@@ -376,5 +377,5 @@ violations on the matmul unit — are exactly the high-volume failure
 modes a static checker can address up front. The PoC shows that the
 engineering surface is small (a single ~865-line stub library covers
 eighteen NKI kernel functions across six tutorials and four contributed
-kernels) and that the verifier is fast (the full 47-target suite
-finishes in about four minutes).
+kernels) and that the verifier is fast (the full 48-target suite
+finishes in about five minutes).
