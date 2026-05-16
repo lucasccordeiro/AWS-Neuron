@@ -240,7 +240,8 @@ three local conventions:
    helpers removed from `stubs.py`. Two narrow Python frontend
    workarounds remain (named-local binding for compound-expression
    scalar tuple-keys and for stubs-module calls on `Tile3D.__setitem__`
-   RHS), filed as a new follow-on.
+   RHS), filed as follow-on
+   [esbmc/esbmc#4564](https://github.com/esbmc/esbmc/issues/4564).
 
 For-loops are native (`for m in nl_affine_range(N):`); tuple
 destructuring is native (`M, N = a.shape`); the `nl_affine_range`
