@@ -72,11 +72,22 @@ class Target:
 # stays phase-1 only (same reason).
 _SAFETY: tuple[str, ...] = ("--overflow-check",)
 
+# Symbolic-shape `--unwind N` values below are k-induction-certified
+# completeness bounds.  An offline `esbmc --k-induction` run on each
+# symbolic target reports "Solution found by the forward condition;
+# all states are reachable (k = N)", meaning the loop genuinely
+# terminates within N unwindings on every nondet input — so plain
+# BMC at `--unwind N` is exhaustive on the symbolic shape family,
+# not merely bounded.  The two exceptions are `mamba_v3_symbolic` and
+# `attn_fwd_v3_symbolic`, where k-induction timed out at 240s; their
+# `--unwind` values remain heuristic and the bound is the soundness
+# caveat documented in REPORT.md.
+
 
 MANIFEST: list[Target] = [
     Target("tensor_add",                 "tensor_add.py",                 (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("tensor_add_buggy",           "tensor_add_buggy.py",           (),                "FAILED"),
-    Target("tensor_add_symbolic",        "tensor_add_symbolic.py",        ("--unwind", "6"), "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
+    Target("tensor_add_symbolic",        "tensor_add_symbolic.py",        ("--unwind", "5"), "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("transpose2d",                "transpose2d.py",                (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("transpose2d_buggy",          "transpose2d_buggy.py",          (),                "FAILED"),
     Target("matmul",                     "matmul.py",                     (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
@@ -103,9 +114,9 @@ MANIFEST: list[Target] = [
     Target("maxpooling_symbolic",        "maxpooling_symbolic.py",        ("--unwind", "5"), "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("mamba_v1_symbolic",          "mamba_v1_symbolic.py",          ("--unwind", "5"), "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("interpolate_bilinear_symbolic", "interpolate_bilinear_symbolic.py",
-                                                                                 ("--unwind", "5"), "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
+                                                                                 ("--unwind", "4"), "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("interpolate_trilinear_symbolic", "interpolate_trilinear_symbolic.py",
-                                                                                 ("--unwind", "5"), "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
+                                                                                 ("--unwind", "3"), "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("matmul_tiled",               "matmul_tiled.py",                      (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("matmul_tiled_buggy",         "matmul_tiled_buggy.py",                (),                "FAILED"),
     Target("matmul_tiled_symbolic",      "matmul_tiled_symbolic.py",             ("--unwind", "4"), "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
@@ -125,7 +136,7 @@ MANIFEST: list[Target] = [
     Target("mamba_v3_symbolic",          "mamba_v3_symbolic.py",                 ("--unwind", "5"), "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("avgpool",                    "avgpool.py",                           (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("avgpool_buggy",              "avgpool_buggy.py",                     (),                "FAILED"),
-    Target("avgpool_symbolic",           "avgpool_symbolic.py",                  ("--unwind", "5"), "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
+    Target("avgpool_symbolic",           "avgpool_symbolic.py",                  ("--unwind", "1"), "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("attn_fwd_v1",                "attn_fwd_v1.py",                       (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("attn_fwd_v1_buggy",          "attn_fwd_v1_buggy.py",                 (),                "FAILED"),
     Target("attn_fwd_v2",                "attn_fwd_v2.py",                       (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),

@@ -100,10 +100,35 @@ for one, conditionally for the other":
 - **Verification soundness (ESBMC's BMC).** Given the stub contracts
   as the ground truth, ESBMC's bounded model checking is sound up to
   the unwinding bound: every path of length ≤ the bound is explored.
-  Ten of our targets are explicitly symbolic and use `--unwind` to
+  Ten of our targets are explicitly symbolic and use `--unwind N` to
   bound the family they sweep; the rest use concrete shapes and finite
   loops where unwinding is exhaustive. The verifier never says
   `SUCCESSFUL` on a path it has not in fact explored.
+
+  The `--unwind N` values for **8 of the 10** symbolic targets are
+  *k-induction-certified completeness bounds*: an offline
+  `esbmc --k-induction` run on each reports `Solution found by the
+  forward condition; all states are reachable (k = N)`, meaning the
+  loop genuinely terminates within N unwindings on every nondet input
+  in the shape family. For those targets the BMC verdict is exhaustive,
+  not merely bounded. The two exceptions — `mamba_v3_symbolic` and
+  `attn_fwd_v3_symbolic` — timed out under k-induction at 240 s; their
+  `--unwind` values remain heuristic and the soundness story for those
+  two reverts to "every path of length ≤ N is explored" rather than
+  "every path is explored." The k values used:
+
+  | Target | `--unwind` | Status |
+  |---|---|---|
+  | `tensor_add_symbolic` | 5 | k-induction certified |
+  | `transpose2d_symbolic` | 5 | k-induction certified |
+  | `maxpooling_symbolic` | 5 | k-induction certified |
+  | `mamba_v1_symbolic` | 5 | k-induction certified |
+  | `interpolate_bilinear_symbolic` | 4 | k-induction certified |
+  | `interpolate_trilinear_symbolic` | 3 | k-induction certified |
+  | `avgpool_symbolic` | 1 | k-induction certified |
+  | `matmul_tiled_symbolic` | 4 | k-induction certified |
+  | `mamba_v3_symbolic` | 5 | heuristic — k-induction timed out |
+  | `attn_fwd_v3_symbolic` | 9 | heuristic — k-induction timed out |
 
 - **Model soundness (do the stub contracts correctly model NKI?).**
   *Conditional*. The stub library is the trusted base of every verdict
