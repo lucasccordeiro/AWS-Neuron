@@ -49,12 +49,10 @@ def matmul_kernel(A_DRAM: Tile, B_DRAM: Tile,
                     n_start_a: int = n2 * TILES_IN_BLOCK_N * TILE_N
                     n_end_a: int   = n_start_a + TILES_IN_BLOCK_N * TILE_N
 
-                    a_tile: Tile = nl_load_2d(A_DRAM, k_start_a, k_end_a,
-                                                      m_start_a, m_end_a)
-                    A_SBUF[k1, :, :] = a_tile
-                    b_tile: Tile = nl_load_2d(B_DRAM, k_start_a, k_end_a,
-                                                      n_start_a, n_end_a)
-                    B_SBUF[k1, :, :] = b_tile
+                    A_SBUF[k1, :, :] = nl_load_2d(A_DRAM, k_start_a, k_end_a,
+                                                          m_start_a, m_end_a)
+                    B_SBUF[k1, :, :] = nl_load_2d(B_DRAM, k_start_a, k_end_a,
+                                                          n_start_a, n_end_a)
 
                 for m1 in nl_affine_range(TILES_IN_BLOCK_M):
                     for n1 in nl_affine_range(TILES_IN_BLOCK_N):

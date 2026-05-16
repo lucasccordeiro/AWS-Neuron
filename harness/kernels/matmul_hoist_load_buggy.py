@@ -29,17 +29,15 @@ def nki_matmul_hoist_load(lhsT: Tile, rhs: Tile) -> Tile:
                                            lhsT.dtype, BUF_SBUF)
         for k in nl_affine_range(K_TILES):
             # BUG: M-end of the lhsT slice is (m+2)*TILE_M instead of (m+1).
-            lhsT_tile: Tile = nl_load_2d(lhsT, k*TILE_K, (k+1)*TILE_K,
-                                               m*TILE_M, (m+2)*TILE_M)
-            lhsT_tiles[k, :, :] = lhsT_tile
+            lhsT_tiles[k, :, :] = nl_load_2d(lhsT, k*TILE_K, (k+1)*TILE_K,
+                                                   m*TILE_M, (m+2)*TILE_M)
 
         for n in nl_affine_range(N // TILE_N):
             rhs_tiles: Tile3D = nl_ndarray_3d(K_TILES, TILE_K, TILE_N,
                                               rhs.dtype, BUF_SBUF)
             for k in nl_affine_range(K_TILES):
-                rhs_tile: Tile = nl_load_2d(rhs, k*TILE_K, (k+1)*TILE_K,
-                                                 n*TILE_N, (n+1)*TILE_N)
-                rhs_tiles[k, :, :] = rhs_tile
+                rhs_tiles[k, :, :] = nl_load_2d(rhs, k*TILE_K, (k+1)*TILE_K,
+                                                     n*TILE_N, (n+1)*TILE_N)
 
             res_psum: Tile = nl_ndarray_2d(TILE_M, TILE_N, DT_F32, BUF_PSUM)
             for k in nl_affine_range(K_TILES):
