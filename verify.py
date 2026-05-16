@@ -64,16 +64,19 @@ class Target:
 
 # Phase-2 flags: `--overflow-check` enables signed integer over/underflow
 # checks; integer division-by-zero is on by default in ESBMC.  Concrete-
-# shape good kernels opt in; buggy variants stay phase-1 only (the shape
-# bug already fails phase-1, phase-2 adds no signal); symbolic-shape and
-# historical-bug targets stay phase-1 only pending tighter preconditions.
+# shape and symbolic-shape good kernels opt in (the symbolic shapes'
+# existing `__ESBMC_assume` bounds are tight enough that signed-int
+# overflow is unreachable across the nondet shape space — no extra
+# preconditions needed); buggy variants stay phase-1 only (the shape
+# bug already fails phase-1, phase-2 adds no signal); historical-bug
+# stays phase-1 only (same reason).
 _SAFETY: tuple[str, ...] = ("--overflow-check",)
 
 
 MANIFEST: list[Target] = [
     Target("tensor_add",                 "tensor_add.py",                 (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("tensor_add_buggy",           "tensor_add_buggy.py",           (),                "FAILED"),
-    Target("tensor_add_symbolic",        "tensor_add_symbolic.py",        ("--unwind", "6"), "SUCCESSFUL"),
+    Target("tensor_add_symbolic",        "tensor_add_symbolic.py",        ("--unwind", "6"), "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("transpose2d",                "transpose2d.py",                (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("transpose2d_buggy",          "transpose2d_buggy.py",          (),                "FAILED"),
     Target("matmul",                     "matmul.py",                     (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
@@ -96,16 +99,16 @@ MANIFEST: list[Target] = [
     Target("matmul_basic_buggy",         "matmul_basic_buggy.py",         (),                "FAILED"),
     Target("mamba_v1",                   "mamba_v1.py",                   (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("mamba_v1_buggy",             "mamba_v1_buggy.py",             (),                "FAILED"),
-    Target("transpose2d_symbolic",       "transpose2d_symbolic.py",       ("--unwind", "5"), "SUCCESSFUL"),
-    Target("maxpooling_symbolic",        "maxpooling_symbolic.py",        ("--unwind", "5"), "SUCCESSFUL"),
-    Target("mamba_v1_symbolic",          "mamba_v1_symbolic.py",          ("--unwind", "5"), "SUCCESSFUL"),
+    Target("transpose2d_symbolic",       "transpose2d_symbolic.py",       ("--unwind", "5"), "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
+    Target("maxpooling_symbolic",        "maxpooling_symbolic.py",        ("--unwind", "5"), "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
+    Target("mamba_v1_symbolic",          "mamba_v1_symbolic.py",          ("--unwind", "5"), "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("interpolate_bilinear_symbolic", "interpolate_bilinear_symbolic.py",
-                                                                                 ("--unwind", "5"), "SUCCESSFUL"),
+                                                                                 ("--unwind", "5"), "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("interpolate_trilinear_symbolic", "interpolate_trilinear_symbolic.py",
-                                                                                 ("--unwind", "5"), "SUCCESSFUL"),
+                                                                                 ("--unwind", "5"), "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("matmul_tiled",               "matmul_tiled.py",                      (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("matmul_tiled_buggy",         "matmul_tiled_buggy.py",                (),                "FAILED"),
-    Target("matmul_tiled_symbolic",      "matmul_tiled_symbolic.py",             ("--unwind", "4"), "SUCCESSFUL"),
+    Target("matmul_tiled_symbolic",      "matmul_tiled_symbolic.py",             ("--unwind", "4"), "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("matmul_hoist_load",          "matmul_hoist_load.py",                 (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("matmul_hoist_load_buggy",    "matmul_hoist_load_buggy.py",           (),                "FAILED"),
     Target("matmul_hoist_load_historical",
@@ -119,17 +122,17 @@ MANIFEST: list[Target] = [
     Target("mamba_v2_buggy",             "mamba_v2_buggy.py",                    (),                "FAILED"),
     Target("mamba_v3",                   "mamba_v3.py",                          (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("mamba_v3_buggy",             "mamba_v3_buggy.py",                    (),                "FAILED"),
-    Target("mamba_v3_symbolic",          "mamba_v3_symbolic.py",                 ("--unwind", "5"), "SUCCESSFUL"),
+    Target("mamba_v3_symbolic",          "mamba_v3_symbolic.py",                 ("--unwind", "5"), "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("avgpool",                    "avgpool.py",                           (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("avgpool_buggy",              "avgpool_buggy.py",                     (),                "FAILED"),
-    Target("avgpool_symbolic",           "avgpool_symbolic.py",                  ("--unwind", "5"), "SUCCESSFUL"),
+    Target("avgpool_symbolic",           "avgpool_symbolic.py",                  ("--unwind", "5"), "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("attn_fwd_v1",                "attn_fwd_v1.py",                       (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("attn_fwd_v1_buggy",          "attn_fwd_v1_buggy.py",                 (),                "FAILED"),
     Target("attn_fwd_v2",                "attn_fwd_v2.py",                       (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("attn_fwd_v2_buggy",          "attn_fwd_v2_buggy.py",                 (),                "FAILED"),
     Target("attn_fwd_v3",                "attn_fwd_v3.py",                       ("--unwind", "5"), "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("attn_fwd_v3_buggy",          "attn_fwd_v3_buggy.py",                 ("--unwind", "5"), "FAILED"),
-    Target("attn_fwd_v3_symbolic",       "attn_fwd_v3_symbolic.py",              ("--unwind", "9"), "SUCCESSFUL"),
+    Target("attn_fwd_v3_symbolic",       "attn_fwd_v3_symbolic.py",              ("--unwind", "9"), "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("pipelined_attention",        "pipelined_attention.py",               (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
 ]
 
