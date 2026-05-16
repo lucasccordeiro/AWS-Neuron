@@ -36,7 +36,7 @@ def attn_fwd_v3(q: Tile, k: Tile, v: Tile) -> Tile:
                            q_sbuf[0:PMAX, i_tile_q * fmax_stationary:(i_tile_q + 1) * fmax_stationary])
             qk_sbuf: Tile = nl_ndarray_2d(PMAX, fmax_moving, DT_F32, BUF_SBUF)
             nisa_tensor_copy(qk_sbuf, qk_psum)
-            nisa_dma_copy(slice_4d_drop_d0_d1(qk, i_tile_q, i_tile_kv), qk_sbuf)
+            nisa_dma_copy(qk[i_tile_q, i_tile_kv, :, :], qk_sbuf)
 
     row_max: Tile = nl_ndarray_2d(PMAX, seqlen_q // PMAX, DT_F32, BUF_SBUF)
     for i_tile_q in nl_affine_range(seqlen_q // PMAX):
@@ -44,7 +44,7 @@ def attn_fwd_v3(q: Tile, k: Tile, v: Tile) -> Tile:
                                          DT_F32, BUF_SBUF)
         for i_tile_kv in nl_affine_range(seqlen_kv // fmax_moving):
             qk_tile: Tile = nl_ndarray_2d(PMAX, fmax_moving, DT_F32, BUF_SBUF)
-            nisa_dma_copy(qk_tile, slice_4d_drop_d0_d1(qk, i_tile_q, i_tile_kv))
+            nisa_dma_copy(qk_tile, qk[i_tile_q, i_tile_kv, :, :])
             nisa_tensor_reduce_2d_axis1(
                 row_max_kv[:, i_tile_kv:i_tile_kv + 1], qk_tile)
         nisa_tensor_reduce_2d_axis1(
@@ -56,8 +56,7 @@ def attn_fwd_v3(q: Tile, k: Tile, v: Tile) -> Tile:
         norm_buf: Tile = nl_ndarray_2d(PMAX, seqlen_kv, DT_F32, BUF_SBUF)
         for i_tile_kv in nl_affine_range(seqlen_kv // fmax_moving):
             qk_tile_sub: Tile = nl_ndarray_2d(PMAX, fmax_moving, DT_F32, BUF_SBUF)
-            nisa_dma_copy(qk_tile_sub,
-                          slice_4d_drop_d0_d1(qk, i_tile_q, i_tile_kv))
+            nisa_dma_copy(qk_tile_sub, qk[i_tile_q, i_tile_kv, :, :])
             nisa_tensor_scalar_broadcast(
                 norm_buf[:, i_tile_kv * fmax_moving:(i_tile_kv + 1) * fmax_moving],
                 qk_tile_sub,
@@ -113,7 +112,7 @@ def attn_fwd_v3(q: Tile, k: Tile, v: Tile) -> Tile:
             nisa_nc_transpose(scores_psum_t, scores_buf_loaded)
             scores_sbuf_t: Tile = nl_ndarray_2d(PMAX, PMAX, DT_F32, BUF_SBUF)
             nisa_tensor_copy(scores_sbuf_t, scores_psum_t)
-            nisa_dma_copy(slice_4d_drop_d0_d1(scores_t, i_tile_kv, i_tile_q),
+            nisa_dma_copy(scores_t[i_tile_kv, i_tile_q, :, :],
                           scores_sbuf_t)
 
     for i_tile_q in nl_affine_range(seqlen_q // PMAX):
@@ -123,7 +122,7 @@ def attn_fwd_v3(q: Tile, k: Tile, v: Tile) -> Tile:
             scores_sbuf_t_loaded: Tile = nl_ndarray_2d(PMAX, PMAX,
                                                        DT_F32, BUF_SBUF)
             nisa_dma_copy(scores_sbuf_t_loaded,
-                          slice_4d_drop_d0_d1(scores_t, i_tile_kv, i_tile_q))
+                          scores_t[i_tile_kv, i_tile_q, :, :])
             v_sbuf_t_loaded: Tile = nl_load_3d_slot(v_t, i_tile_kv)
             nisa_nc_matmul(attn_out_psum, scores_sbuf_t_loaded,
                            v_sbuf_t_loaded)

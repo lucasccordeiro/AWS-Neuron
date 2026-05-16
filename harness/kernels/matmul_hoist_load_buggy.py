@@ -29,23 +29,23 @@ def nki_matmul_hoist_load(lhsT: Tile, rhs: Tile) -> Tile:
                                            lhsT.dtype, BUF_SBUF)
         for k in nl_affine_range(K_TILES):
             # BUG: M-end of the lhsT slice is (m+2)*TILE_M instead of (m+1).
-            slab_set(lhsT_tiles, k,
-                     nl_load_2d(lhsT, k*TILE_K, (k+1)*TILE_K,
-                                      m*TILE_M, (m+2)*TILE_M))
+            lhsT_tile: Tile = nl_load_2d(lhsT, k*TILE_K, (k+1)*TILE_K,
+                                               m*TILE_M, (m+2)*TILE_M)
+            lhsT_tiles[k, :, :] = lhsT_tile
 
         for n in nl_affine_range(N // TILE_N):
             rhs_tiles: Tile3D = nl_ndarray_3d(K_TILES, TILE_K, TILE_N,
                                               rhs.dtype, BUF_SBUF)
             for k in nl_affine_range(K_TILES):
-                slab_set(rhs_tiles, k,
-                         nl_load_2d(rhs, k*TILE_K, (k+1)*TILE_K,
-                                         n*TILE_N, (n+1)*TILE_N))
+                rhs_tile: Tile = nl_load_2d(rhs, k*TILE_K, (k+1)*TILE_K,
+                                                 n*TILE_N, (n+1)*TILE_N)
+                rhs_tiles[k, :, :] = rhs_tile
 
             res_psum: Tile = nl_ndarray_2d(TILE_M, TILE_N, DT_F32, BUF_PSUM)
             for k in nl_affine_range(K_TILES):
                 nisa_nc_matmul(res_psum,
-                               slab_get(lhsT_tiles, k),
-                               slab_get(rhs_tiles,  k))
+                               lhsT_tiles[k, :, :],
+                               rhs_tiles[k, :, :])
 
             res_sb: Tile = nl_ndarray_2d(TILE_M, TILE_N, result.dtype, BUF_SBUF)
             nisa_tensor_copy(res_sb, res_psum)

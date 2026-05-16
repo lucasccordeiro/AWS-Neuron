@@ -29,18 +29,16 @@ def mamba_v3(delta: Tile3D, u: Tile3D, A: Tile, B: Tile3D, C: Tile3D,
             scanC_accum: Tile = nl_zeros_2d(channel_psize, seq_len,
                                             delta.dtype, BUF_SBUF)
 
-            delta_slice: Tile = slice_3d_at(delta, i_batch,
-                                            channel_start,
-                                            channel_start + channel_psize,
-                                            0, seq_len)
+            delta_slice: Tile = delta[i_batch,
+                                      channel_start:channel_start + channel_psize,
+                                      0:seq_len]
             delta_i: Tile = nl_ndarray_2d(channel_psize, seq_len,
                                           delta.dtype, BUF_SBUF)
             nisa_dma_copy(delta_i, delta_slice)
 
-            u_slice: Tile = slice_3d_at(u, i_batch,
-                                        channel_start,
-                                        channel_start + channel_psize,
-                                        0, seq_len)
+            u_slice: Tile = u[i_batch,
+                              channel_start:channel_start + channel_psize,
+                              0:seq_len]
             u_i: Tile = nl_ndarray_2d(channel_psize, seq_len,
                                       u.dtype, BUF_SBUF)
             nisa_dma_copy(u_i, u_slice)
@@ -63,9 +61,8 @@ def mamba_v3(delta: Tile3D, u: Tile3D, A: Tile, B: Tile3D, C: Tile3D,
                                     delta_i[:, seq_len_start:seq_len_end],
                                     A_i)
 
-                    B_slice: Tile = slice_3d_at(B, i_batch,
-                                                i_state, i_state + 1,
-                                                seq_len_start, seq_len_end)
+                    B_slice: Tile = B[i_batch, i_state:i_state + 1,
+                                      seq_len_start:seq_len_end]
                     B_i: Tile = nl_ndarray_2d(1, seq_len_fsize, B.dtype, BUF_SBUF)
                     nisa_dma_copy(B_i, B_slice)
 
@@ -87,9 +84,8 @@ def mamba_v3(delta: Tile3D, u: Tile3D, A: Tile, B: Tile3D, C: Tile3D,
                                      scan_res[:, seq_len_fsize - 1:seq_len_fsize])
 
                     # BUG: C slice extends one element past seq_len_end.
-                    C_slice: Tile = slice_3d_at(C, i_batch,
-                                                i_state, i_state + 1,
-                                                seq_len_start, seq_len_end + 1)
+                    C_slice: Tile = C[i_batch, i_state:i_state + 1,
+                                      seq_len_start:seq_len_end + 1]
                     C_i: Tile = nl_ndarray_2d(1, seq_len_fsize, C.dtype, BUF_SBUF)
                     nisa_dma_copy(C_i, C_slice)
 
@@ -102,10 +98,9 @@ def mamba_v3(delta: Tile3D, u: Tile3D, A: Tile, B: Tile3D, C: Tile3D,
                                        scanC_accum[:, seq_len_start:seq_len_end],
                                        scanC)
 
-            out_slice: Tile = slice_3d_at(output, i_batch,
-                                          channel_start,
-                                          channel_start + channel_psize,
-                                          0, seq_len)
+            out_slice: Tile = output[i_batch,
+                                     channel_start:channel_start + channel_psize,
+                                     0:seq_len]
             nisa_dma_copy(out_slice, scanC_accum)
 
     return output

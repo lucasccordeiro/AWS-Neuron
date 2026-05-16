@@ -37,9 +37,10 @@ def nki_matmul_block_free(lhsT: Tile, rhs: Tile) -> Tile:
             for k in nl_affine_range(K_TILES):
                 m_idx: int = m * TILES_IN_BLOCK_M + bm
                 # BUG: M-end of the lhsT slice is (m_idx+2)*TILE_M instead of +1.
-                slab_set(lhsT_tiles, bm * K_TILES + k,
-                         nl_load_2d(lhsT, k*TILE_K, (k+1)*TILE_K,
-                                          m_idx*TILE_M, (m_idx+2)*TILE_M))
+                lhsT_tile: Tile = nl_load_2d(lhsT, k*TILE_K, (k+1)*TILE_K,
+                                                   m_idx*TILE_M, (m_idx+2)*TILE_M)
+                slab_l: int = bm * K_TILES + k
+                lhsT_tiles[slab_l, :, :] = lhsT_tile
 
         for n in nl_affine_range(N // BLOCK_N):
             rhs_tiles: Tile3D = nl_ndarray_3d(TILES_IN_BLOCK_N * K_TILES,
@@ -48,18 +49,21 @@ def nki_matmul_block_free(lhsT: Tile, rhs: Tile) -> Tile:
             for bn in nl_affine_range(TILES_IN_BLOCK_N):
                 for k in nl_affine_range(K_TILES):
                     n_idx: int = n * TILES_IN_BLOCK_N + bn
-                    slab_set(rhs_tiles, bn * K_TILES + k,
-                             nl_load_2d(rhs, k*TILE_K, (k+1)*TILE_K,
-                                             n_idx*TILE_N, (n_idx+1)*TILE_N))
+                    rhs_tile: Tile = nl_load_2d(rhs, k*TILE_K, (k+1)*TILE_K,
+                                                     n_idx*TILE_N, (n_idx+1)*TILE_N)
+                    slab_r: int = bn * K_TILES + k
+                    rhs_tiles[slab_r, :, :] = rhs_tile
 
             for bm in nl_affine_range(TILES_IN_BLOCK_M):
                 for bn in nl_affine_range(TILES_IN_BLOCK_N):
                     res_psum: Tile = nl_ndarray_2d(TILE_M, TILE_N,
                                                    DT_F32, BUF_PSUM)
                     for k in nl_affine_range(K_TILES):
+                        slab_lg: int = bm * K_TILES + k
+                        slab_rg: int = bn * K_TILES + k
                         nisa_nc_matmul(res_psum,
-                                       slab_get(lhsT_tiles, bm * K_TILES + k),
-                                       slab_get(rhs_tiles,  bn * K_TILES + k))
+                                       lhsT_tiles[slab_lg, :, :],
+                                       rhs_tiles[slab_rg, :, :])
 
                     res_tmp: Tile = nl_ndarray_2d(TILE_M, TILE_N,
                                                   result.dtype, BUF_SBUF)

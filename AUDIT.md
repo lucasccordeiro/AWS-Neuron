@@ -125,7 +125,7 @@ After resolution the canonical `stubs.py` will export:
 
 **Load / store**: `nl_load_2d`, `nl_store_2d`
 
-**3-D indexing**: `slab_get`, `slab_set`, `slab_cols_get`, `slab_cols_set`
+**3-D indexing**: `Tile3D.__getitem__` / `__setitem__` (`t[k, r0:r1, c0:c1]`)
 
 **ISA ops**: `nisa_dma_copy`, `nisa_tensor_tensor`, `nisa_tensor_copy`,
 `ni_nc_matmul`

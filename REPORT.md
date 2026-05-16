@@ -57,9 +57,9 @@ descending order of how much we trust each:
    `nisa.tensor_tensor`, three-way par-dim agreement on `nl.matmul`,
    and so on. Each stub has a comment naming the contract it encodes.
 3. **Pure Python semantics of the construct being modelled.** Standard
-   slice-bounds (`0 <= r0 <= r1 <= src.d0` in `slice2d`); range
-   checks on integer indices (`0 <= k < t.d0` in `slab_get`); these
-   are non-NKI-specific and would apply to any container library.
+   slice-bounds (`0 <= r0 <= r1 <= self.d0` in `Tile.__getitem__`); range
+   checks on integer indices (`0 <= k < self.d0` in `Tile3D.__getitem__`);
+   these are non-NKI-specific and would apply to any container library.
 4. **Audit-driven refinement.** When ESBMC catches a contract being
    wrong, the stub is corrected and the finding logged in `AUDIT.md`.
    Two such incidents to date:
@@ -139,10 +139,10 @@ Tile, Tile3D, Tile4D, Tile5D        # 2/3/4/5-D tiles (d0..d4, dtype, buffer)
 IndexTensor                         # value-range model for mgrid-style indices
 nl_ndarray_2d / _3d / _4d / _5d     # allocation; partition-dim limit on SBUF/PSUM
 nl_zeros_2d / _3d / _4d             # zero-initialised allocation
-slice2d, slice_cols                 # view-style slicing
+Tile.__getitem__                    # `t[r0:r1, c0:c1]` view-style 2-D slicing
 nl_load_2d, nl_store_2d             # HBM <-> SBUF with implicit slicing
 nl_load_2d_full, nl_store_2d_full   # full-tile load/store (no implicit slice)
-slab_get / set / cols_get / set     # 3-D indexing for matmul-style layouts
+Tile3D.__getitem__ / __setitem__    # `t[k, r0:r1, c0:c1]` 3-D indexing for matmul-style layouts
 nisa_dma_copy, _dma_copy_3d,        # ISA-level ops with shape + dtype checks
    _tensor_tensor, _tensor_copy
 nisa_tensor_scalar_3d               # scalar-broadcast op on 3-D tiles
@@ -157,14 +157,13 @@ nisa_nc_transpose                   # nisa.nc_transpose explicit-dst
 nisa_tensor_reduce_2d_axis1         # nisa.tensor_reduce(axis=(1,)) explicit-dst
 nisa_reciprocal_2d                  # nisa.reciprocal(dst, data)
 nisa_activation_no_scale            # nisa.activation without scale operand
-slice_4d_drop_d0_d1                 # t[k0, k1, :, :] — 4-D scalar+scalar+:+: view
+Tile4D.__getitem__                  # `t[k0, k1, :, :]` 4-D scalar+scalar+:+: view
 nl_load_3d_slot, nl_store_3d_slot   # nl.load(t[k]) / nl.store(t[k], v) for 3-D HBM
 nl_load_3d_at                       # nl.load(t[i, r0:r1, c0:c1]) for 3-D HBM
 ni_nc_matmul, nisa_nc_matmul        # nc_matmul (returning + explicit-destination)
 nisa_activation                     # elementwise unary (e.g. nl.exp) with scale
 nisa_tensor_tensor_scan             # associative scan (shape-passthrough)
 nl_broadcast_to                     # 1-axis broadcast to a new shape
-slice_3d_at                         # 3-D tensor with scalar + range axes
 iadd, nl_loop_reduce                # accumulation in PSUM, loop reduction
 nisa_memset                         # in-place initialise (shape-only)
 
@@ -232,16 +231,16 @@ three local conventions:
    [#4554](https://github.com/esbmc/esbmc/issues/4554)).
    The higher-arity slice forms (`slice_3d_at`,
    `slice_4d_drop_d0_d1`, `slab_get`/`_set`,
-   `slab_cols_get`/`_set`) remain wrapped as free-function calls
-   across ~86 sites. PR #4557 closed #4552 (two cross-module classes
-   with `__getitem__` at different arities) — the residual blocker is
-   [esbmc/esbmc#4558](https://github.com/esbmc/esbmc/issues/4558):
-   when the first scalar element of a tuple-key of arity ≥ 3 is a
-   *variable* (loop index, parameter, local) rather than a literal,
-   the imported-class `__getitem__` still crashes (`symbolic_type_excp`
-   for Tile3D, `dereference failure: Incorrect alignment` for Tile4D).
-   Every PoC higher-arity site uses a loop variable as the scalar
-   axis, so closing #4558 retires all ~86 of them.
+   `slab_cols_get`/`_set`) retired in turn with
+   [PR #4563](https://github.com/esbmc/esbmc/pull/4563) (closing
+   [#4558](https://github.com/esbmc/esbmc/issues/4558), variable-scalar
+   tuple-keys on imported `Tile3D`/`Tile4D`): the 92 call sites across
+   17 kernel files were converted to natural `t[k, r0:r1, c0:c1]` and
+   `t[k0, k1, :, :]` indexing in one mechanical sweep and the six
+   helpers removed from `stubs.py`. Two narrow Python frontend
+   workarounds remain (named-local binding for compound-expression
+   scalar tuple-keys and for stubs-module calls on `Tile3D.__setitem__`
+   RHS), filed as a new follow-on.
 
 For-loops are native (`for m in nl_affine_range(N):`); tuple
 destructuring is native (`M, N = a.shape`); the `nl_affine_range`
