@@ -90,11 +90,14 @@ asserts the kernel's output contract.
 | `matmul_tiled_symbolic` | `matmul_tiled_symbolic.py` | `kernels/matmul_tiled.py` | `SUCCESSFUL` (`--unwind 4`; M ∈ {128, 256, 384}, N ∈ {512, 1024}) |
 | `matmul_hoist_load` | `matmul_hoist_load.py` | `kernels/matmul_hoist_load.py` | `SUCCESSFUL` |
 | `matmul_hoist_load_buggy` | `matmul_hoist_load_buggy.py` | `kernels/matmul_hoist_load_buggy.py` | `FAILED` |
+| `matmul_hoist_load_symbolic` | `matmul_hoist_load_symbolic.py` | `kernels/matmul_hoist_load.py` | `SUCCESSFUL` (`--unwind 3`; K, M ∈ {128, 256}, N ∈ {512, 1024}) |
 | `matmul_hoist_load_historical` | `matmul_hoist_load_historical.py` | `kernels/matmul_hoist_load_historical.py` | `FAILED` — reproduces the pre-fix bug from upstream [aws-neuron/nki-samples#74](https://github.com/aws-neuron/nki-samples/pull/74) |
 | `matmul_block_free` | `matmul_block_free.py` | `kernels/matmul_block_free.py` | `SUCCESSFUL` |
 | `matmul_block_free_buggy` | `matmul_block_free_buggy.py` | `kernels/matmul_block_free_buggy.py` | `FAILED` |
+| `matmul_block_free_symbolic` | `matmul_block_free_symbolic.py` | `kernels/matmul_block_free.py` | `SUCCESSFUL` (`--unwind 3`; K ∈ {128, 256}, M ∈ {256, 512}, N ∈ {1024, 2048}) |
 | `matmul_fully_optimized` | `matmul_fully_optimized.py` | `kernels/matmul_fully_optimized.py` | `SUCCESSFUL` |
 | `matmul_fully_optimized_buggy` | `matmul_fully_optimized_buggy.py` | `kernels/matmul_fully_optimized_buggy.py` | `FAILED` |
+| `matmul_fully_optimized_symbolic` | `matmul_fully_optimized_symbolic.py` | `kernels/matmul_fully_optimized.py` | `SUCCESSFUL` (`--unwind 3`; K, M ∈ {256, 512}, N ∈ {1024, 2048}) |
 | `mamba_v2` | `mamba_v2.py` | `kernels/mamba_v2.py` | `SUCCESSFUL` |
 | `mamba_v2_buggy` | `mamba_v2_buggy.py` | `kernels/mamba_v2_buggy.py` | `FAILED` |
 | `mamba_v3` | `mamba_v3.py` | `kernels/mamba_v3.py` | `SUCCESSFUL` |
@@ -136,9 +139,11 @@ its status, kernel coverage tree, and source-rewriting status. Open it
 locally after `make dashboard` to see the current state of the PoC.
 
 Concrete-shape targets complete in 1–3 seconds wall-clock each on a
-stock laptop. The ten symbolic-shape targets run for ~5–90 seconds
-depending on the size of the shape family they sweep. Phase-1 (51 runs)
-finishes in about 9 minutes; phase-2 (31 runs — every concrete- and
+stock laptop. The thirteen symbolic-shape targets run for ~5–90
+seconds depending on the size of the shape family they sweep —
+eleven of the thirteen `--unwind` values are k-induction-certified
+complete (see `REPORT.md` for the table). Phase-1 (54 runs) finishes
+in about 9 minutes; phase-2 (34 runs — every concrete- and
 symbolic-shape good kernel plus the AUDIT-15 reproducer) finishes in
 about 6 minutes; the combined two-phase sweep is ~15 minutes end-to-end.
 

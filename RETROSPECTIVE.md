@@ -8,10 +8,10 @@ assumes familiarity with the verifier but not with NKI.
 
 - **19 NKI kernel functions ported** (across 11 upstream source files —
   6 tutorials, 5 community-`contributed/` kernels, one of which is a
-  shape-skeleton port only), 51 phase-1 build targets (concrete +
-  positive-control + 10 symbolic-shape variants + 1 historical-bug
+  shape-skeleton port only), 54 phase-1 build targets (concrete +
+  positive-control + 13 symbolic-shape variants + 1 historical-bug
   reproduction + 1 shape-skeleton + 2 boundary-input regression
-  targets) + 31 phase-2 runs (every concrete- and symbolic-shape good
+  targets) + 34 phase-2 runs (every concrete- and symbolic-shape good
   kernel with `--overflow-check`, plus the host-arithmetic safety
   reproducer), 100 % pass rate against expected verdicts; phase-1
   finishes in about 9 minutes wall-clock, phase-2 in about 6 minutes,

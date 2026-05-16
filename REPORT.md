@@ -100,12 +100,12 @@ for one, conditionally for the other":
 - **Verification soundness (ESBMC's BMC).** Given the stub contracts
   as the ground truth, ESBMC's bounded model checking is sound up to
   the unwinding bound: every path of length ≤ the bound is explored.
-  Ten of our targets are explicitly symbolic and use `--unwind N` to
-  bound the family they sweep; the rest use concrete shapes and finite
-  loops where unwinding is exhaustive. The verifier never says
+  Thirteen of our targets are explicitly symbolic and use `--unwind N`
+  to bound the family they sweep; the rest use concrete shapes and
+  finite loops where unwinding is exhaustive. The verifier never says
   `SUCCESSFUL` on a path it has not in fact explored.
 
-  The `--unwind N` values for **8 of the 10** symbolic targets are
+  The `--unwind N` values for **11 of the 13** symbolic targets are
   *k-induction-certified completeness bounds*: an offline
   `esbmc --k-induction` run on each reports `Solution found by the
   forward condition; all states are reachable (k = N)`, meaning the
@@ -127,6 +127,9 @@ for one, conditionally for the other":
   | `interpolate_trilinear_symbolic` | 3 | k-induction certified |
   | `avgpool_symbolic` | 1 | k-induction certified |
   | `matmul_tiled_symbolic` | 4 | k-induction certified |
+  | `matmul_hoist_load_symbolic` | 3 | k-induction certified |
+  | `matmul_block_free_symbolic` | 3 | k-induction certified |
+  | `matmul_fully_optimized_symbolic` | 3 | k-induction certified |
   | `mamba_v3_symbolic` | 5 | heuristic — k-induction timed out |
   | `attn_fwd_v3_symbolic` | 9 | heuristic — k-induction timed out |
 
@@ -365,17 +368,20 @@ break the symmetry naturally.
 
 ## What still does not work
 
-- **Most targets use concrete shapes.** Ten symbolic-shape targets
-  exist (`tensor_add_symbolic`, `transpose2d_symbolic`,
+- **Most targets use concrete shapes.** Thirteen symbolic-shape
+  targets exist (`tensor_add_symbolic`, `transpose2d_symbolic`,
   `maxpooling_symbolic`, `mamba_v1_symbolic`,
   `interpolate_bilinear_symbolic`, `interpolate_trilinear_symbolic`,
   `avgpool_symbolic`, `mamba_v3_symbolic`, `matmul_tiled_symbolic`,
-  `attn_fwd_v3_symbolic`)
+  `matmul_hoist_load_symbolic`, `matmul_block_free_symbolic`,
+  `matmul_fully_optimized_symbolic`, `attn_fwd_v3_symbolic`)
   — each sweeps a small bounded family of legal shapes via
-  `nondet_int` + `__ESBMC_assume` and verifies under `--unwind 5` or 6.
-  The `matmul` family is not symbolicised: matmul has six nested loops
-  that push BMC unwinding hard, and `matmul_basic` hardcodes its
-  dimensions in the kernel's own asserts. k-induction would lift the
+  `nondet_int` + `__ESBMC_assume` and verifies under `--unwind 1` to
+  `--unwind 9`, with eleven of the thirteen bounds certified complete
+  by k-induction (see the soundness paragraph above for the table).
+  `matmul_basic` is the only matmul kernel without a symbolic variant:
+  it hardcodes its dimensions in the kernel's own asserts, so there is
+  no shape family to sweep. k-induction would lift the
   unwind bound but has not been wired up here.
 - **Float semantics are unused.** Only int-typed shape arithmetic enters
   the SMT problem. Dtypes are opaque tags.
