@@ -49,18 +49,18 @@ def nki_matmul_fully_optimized(lhsT: Tile, rhs: Tile,
             for bk_r in nl_affine_range(TILES_IN_BLOCK_K):
                 k_idx: int = TILES_IN_BLOCK_K * k + bk_r
                 # BUG: K-end of the rhs slice is (k_idx+2) instead of (k_idx+1).
-                rhs_tile: Tile = nl_load_2d(rhs, k_idx*TILE_K, (k_idx+2)*TILE_K,
-                                                 BLOCK_N*n, BLOCK_N*(n+1))
-                rhs_tiles[bk_r, :, :] = rhs_tile
+                rhs_tiles[bk_r, :, :] = nl_load_2d(
+                    rhs, k_idx*TILE_K, (k_idx+2)*TILE_K,
+                    BLOCK_N*n, BLOCK_N*(n+1))
 
             for m in nl_affine_range(NUM_BLOCK_M):
                 lhsT_tiles: Tile3D = nl_ndarray_3d(TILES_IN_BLOCK_K, TILE_K, BLOCK_M,
                                                    lhsT.dtype, BUF_SBUF)
                 for bk_l in nl_affine_range(TILES_IN_BLOCK_K):
                     k_idx2: int = TILES_IN_BLOCK_K * k + bk_l
-                    lhsT_tile: Tile = nl_load_2d(lhsT, k_idx2*TILE_K, (k_idx2+1)*TILE_K,
-                                                       BLOCK_M*m, BLOCK_M*(m+1))
-                    lhsT_tiles[bk_l, :, :] = lhsT_tile
+                    lhsT_tiles[bk_l, :, :] = nl_load_2d(
+                        lhsT, k_idx2*TILE_K, (k_idx2+1)*TILE_K,
+                        BLOCK_M*m, BLOCK_M*(m+1))
 
                 for bn in nl_affine_range(TILES_IN_BLOCK_N):
                     for bm in nl_affine_range(TILES_IN_BLOCK_M):

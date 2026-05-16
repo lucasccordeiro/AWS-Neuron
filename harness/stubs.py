@@ -77,14 +77,7 @@ class Tile3D:
         return Tile(r1 - r0, c1 - c0, self.dtype, self.buffer)
 
     def __setitem__(self, key, value: "Tile") -> None:
-        """`t[k, sl1, sl2] = value` — same shape contract as __getitem__'s view.
-
-        Kernels currently bind the RHS to a named local before the
-        assignment when the RHS would be a direct stubs-module call
-        (e.g. `nl_load_2d(...)`); the equivalent inline form crashes
-        ESBMC's Python frontend with `Function … not found`. Tracked as
-        a follow-on to esbmc/esbmc#4558.
-        """
+        """`t[k, sl1, sl2] = value` — same shape contract as __getitem__'s view."""
         k: int   = key[0]
         sl1: slice = key[1]
         sl2: slice = key[2]

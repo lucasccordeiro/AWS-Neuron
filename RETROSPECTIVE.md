@@ -23,17 +23,18 @@ assumes familiarity with the verifier but not with NKI.
   `audit15_hostarith_unguarded` target — a counterexample with
   `chunk_size = 1 → step_size = 0` on the upstream trip-count
   expression, CWE-369, with no port-time precondition in the path.
-- **~20 ESBMC Python-frontend issues filed upstream.** All resolved
-  in-tree except one open follow-on ([#4564](https://github.com/esbmc/esbmc/issues/4564))
-  covering two narrow Python frontend workarounds that surfaced during
-  the last retirement (named-local binding for compound-expression
-  scalar tuple-keys and for stubs-module calls on `Tile3D.__setitem__`
-  RHS). The previous blocker ([#4558](https://github.com/esbmc/esbmc/issues/4558),
-  variable-scalar in arity-≥3 tuple-key on imported `Tile3D`/`Tile4D`)
-  closed via [PR #4563](https://github.com/esbmc/esbmc/pull/4563),
-  retiring the six `slab_*` / `slice_3d_at` / `slice_4d_drop_d0_d1`
-  helpers and their ~92 call sites. See the *Upstream issues filed*
-  table below for the full ledger.
+- **~20 ESBMC Python-frontend issues filed upstream — all resolved
+  in-tree.** The two most recent
+  ([#4558](https://github.com/esbmc/esbmc/issues/4558) closed via
+  [PR #4563](https://github.com/esbmc/esbmc/pull/4563), and follow-on
+  [#4564](https://github.com/esbmc/esbmc/issues/4564) closed via
+  [PR #4567](https://github.com/esbmc/esbmc/pull/4567)) together
+  retired the last source-rewrite layer — the six `slab_*` /
+  `slice_3d_at` / `slice_4d_drop_d0_d1` helpers, their ~92 call sites,
+  and the 19 named-local-binding workarounds that the helper
+  retirement initially needed. The kernels are now byte-for-byte
+  faithful to the upstream NKI source for indexing. See the *Upstream
+  issues filed* table below for the full ledger.
 - **1 real upstream bug caught retroactively** —
   [aws-neuron/nki-samples#74](https://github.com/aws-neuron/nki-samples/pull/74)
   (pre-fix `nki_matmul_hoist_load_` allocated lhsT slab with the wrong
@@ -157,8 +158,8 @@ Catalogued at a glance to show breadth:
 | [#4542](https://github.com/esbmc/esbmc/issues/4542) | **RESOLVED** ([PR #4549](https://github.com/esbmc/esbmc/pull/4549)) | heterogeneous-tuple `__getitem__` key elements don't thread — mix of scalars and slices, including pure-scalar tuples, fails to install per-element values into `key` | local-class form verified; cross-module form still blocked by #4545 (same root pattern), so the higher-arity rewrites stay in place across ~86 call sites |
 | [#4543](https://github.com/esbmc/esbmc/issues/4543) | **RESOLVED** ([PR #4551](https://github.com/esbmc/esbmc/pull/4551)) | bare `:` slice modelled as `slice(0, 0)`, indistinguishable from explicit `0:0` empty slice (Python semantics: `slice(None, None, None)`) | `sl.start is None` now distinguishes bare `:` from `0:0`; PoC kernels can use `t[:, c0:c1]` natural form once #4545's transitive-import case closes |
 | [#4552](https://github.com/esbmc/esbmc/issues/4552) | **RESOLVED** ([PR #4557](https://github.com/esbmc/esbmc/pull/4557)) | two cross-module classes with `__getitem__` at different subscript arities crash with `type mismatch: got pointer, expected struct` when both are used in the same TU | static-key cases work; variable-scalar in tuple-key still crashes, filed as follow-on [#4558](https://github.com/esbmc/esbmc/issues/4558) |
-| [#4558](https://github.com/esbmc/esbmc/issues/4558) | **RESOLVED** ([PR #4563](https://github.com/esbmc/esbmc/pull/4563)) | `__getitem__` on imported Tile3D/Tile4D crashes when the first scalar element of a tuple-key of arity ≥ 3 is a Python variable (loop index, parameter, local) — `symbolic_type_excp` for Tile3D, `dereference failure: Incorrect alignment` for Tile4D | retired the 92 `slab_get`/`set`/`_cols_get`/`_cols_set` + `slice_3d_at` + `slice_4d_drop_d0_d1` call sites across 17 kernel files; all six helpers removed from stubs.py. Two narrow follow-on workarounds remain (named-local binding for compound-expression scalar tuple-keys and for stubs-module call on `__setitem__` RHS); filed as follow-on [#4564](https://github.com/esbmc/esbmc/issues/4564) |
-| [#4564](https://github.com/esbmc/esbmc/issues/4564) | OPEN | two narrow cross-module dunder-indexing cases on imported `Tile3D`: (1) `t[compound_expr, :, :]` crashes BMC (`type2t::symbolic_type_excp`) when `__getitem__` binds tuple-key slice axes to typed locals; (2) `t[k, :, :] = stubs_module_func(...)` fails at conversion (`Function … not found`) on direct cross-module call in `__setitem__` RHS | 19 named-local-binding workarounds remain across the matmul family (8 sites for case 1, 11 for case 2); closing #4564 retires them and the kernels become byte-for-byte faithful to the upstream NKI source for indexing |
+| [#4558](https://github.com/esbmc/esbmc/issues/4558) | **RESOLVED** ([PR #4563](https://github.com/esbmc/esbmc/pull/4563)) | `__getitem__` on imported Tile3D/Tile4D crashes when the first scalar element of a tuple-key of arity ≥ 3 is a Python variable (loop index, parameter, local) — `symbolic_type_excp` for Tile3D, `dereference failure: Incorrect alignment` for Tile4D | retired the 92 `slab_get`/`set`/`_cols_get`/`_cols_set` + `slice_3d_at` + `slice_4d_drop_d0_d1` call sites across 17 kernel files; all six helpers removed from stubs.py. Two narrow follow-on workarounds remained (named-local binding for compound-expression scalar tuple-keys and for stubs-module call on `__setitem__` RHS), filed as follow-on [#4564](https://github.com/esbmc/esbmc/issues/4564) and since retired |
+| [#4564](https://github.com/esbmc/esbmc/issues/4564) | **RESOLVED** ([PR #4567](https://github.com/esbmc/esbmc/pull/4567)) | two narrow cross-module dunder-indexing cases on imported `Tile3D`: (1) `t[compound_expr, :, :]` crashes BMC (`type2t::symbolic_type_excp`) when `__getitem__` binds tuple-key slice axes to typed locals; (2) `t[k, :, :] = stubs_module_func(...)` fails at conversion (`Function … not found`) on direct cross-module call in `__setitem__` RHS | retired the 19 named-local-binding workarounds across the matmul family (8 sites for case 1, 11 for case 2); the kernels are now byte-for-byte faithful to the upstream NKI source for indexing |
 | [#4515](https://github.com/esbmc/esbmc/issues/4515) | **RESOLVED** ([PR #4524](https://github.com/esbmc/esbmc/pull/4524)) | tuple unpack fails when source is class attribute or `tuple`-typed parameter | retired in 6 kernels; interpolate kernels gated by follow-on [#4532](https://github.com/esbmc/esbmc/issues/4532) |
 | [#4532](https://github.com/esbmc/esbmc/issues/4532) | **RESOLVED** ([PR #4534](https://github.com/esbmc/esbmc/pull/4534)) | destructured tuple-attr variable not visible in arithmetic if-condition inside for-loop body | retired; interpolate kernels now use `M, N = a.shape` form |
 | [#4516](https://github.com/esbmc/esbmc/issues/4516) | **RESOLVED** ([PR #4521](https://github.com/esbmc/esbmc/pull/4521)) | `for`-loop over an alias of `range` or a function returning `range` fails | retired the `while`-loop rewrite; native `for` loops back in kernels |
@@ -189,17 +190,16 @@ the ESBMC team to see what their fixes unblocked end-to-end.
 | Same-name entry script + imported kernel | `verify_<name>.py` prefix to disambiguate | [PR #4517](https://github.com/esbmc/esbmc/pull/4517) (closing #4513) | entry scripts share the kernel's basename |
 | `from kernels.X import Y` reaching `from stubs import Z` | build-time concatenation of stubs + kernel + harness into one file | [PR #4512](https://github.com/esbmc/esbmc/pull/4512) (closing #4509) | native multi-file imports |
 | `a[i:j, k:l]` | `slice2d(a, i, j, k, l)` free-function call | [PR #4555](https://github.com/esbmc/esbmc/pull/4555) (closing #4554, the final 3-file transitive-import case) | natural `a[i:j, k:l]` and `a[:, c0:c1]` via `Tile.__getitem__`. The 9-PR chain that unlocked this: #4522 (closing #4514), #4528 (#4523), #4538 (#4537), #4540 (#4539), #4544 (#4541, single-file form), #4549 (#4542, heterogeneous tuples), #4551 (#4543, bare-`:` modelling), #4553 (#4545, 2-file cross-module), and #4555 (#4554, 3-file transitive-import). The 62 two-axis call sites all converted in one mechanical sweep; `slice2d` and `slice_cols` removed from stubs.py. |
-| `slice_3d_at(t, i, r0, r1, c0, c1)`, `slab_get(t, k)`, `slab_set(t, k, v)`, `slab_cols_get(t, k, c0, c1)`, `slab_cols_set(t, k, c0, c1, v)`, `slice_4d_drop_d0_d1(t, k0, k1)` | six free-function helpers in `stubs.py`, ~92 call sites across the matmul, mamba, and attn_fwd_v3 families | [PR #4563](https://github.com/esbmc/esbmc/pull/4563) (closing #4558, variable-scalar tuple-key in 3-file cross-module form) | natural `Tile3D.__getitem__` / `__setitem__` (`t[k, :, :]`, `t[k, r0:r1, c0:c1]`) and `Tile4D.__getitem__` (`t[k0, k1, :, :]`). All six helpers removed from `stubs.py`; the ~92 sites converted in one mechanical sweep. Two narrow follow-on workarounds remain (named-local binding for compound-expression scalar tuple-keys and for stubs-module call on `__setitem__` RHS); filed as follow-on [#4564](https://github.com/esbmc/esbmc/issues/4564). |
+| `slice_3d_at(t, i, r0, r1, c0, c1)`, `slab_get(t, k)`, `slab_set(t, k, v)`, `slab_cols_get(t, k, c0, c1)`, `slab_cols_set(t, k, c0, c1, v)`, `slice_4d_drop_d0_d1(t, k0, k1)` | six free-function helpers in `stubs.py`, ~92 call sites across the matmul, mamba, and attn_fwd_v3 families | [PR #4563](https://github.com/esbmc/esbmc/pull/4563) (closing #4558, variable-scalar tuple-key in 3-file cross-module form) | natural `Tile3D.__getitem__` / `__setitem__` (`t[k, :, :]`, `t[k, r0:r1, c0:c1]`) and `Tile4D.__getitem__` (`t[k0, k1, :, :]`). All six helpers removed from `stubs.py`; the ~92 sites converted in one mechanical sweep. Two narrow follow-on workarounds initially remained (named-local binding for compound-expression scalar tuple-keys and for stubs-module call on `__setitem__` RHS), filed as follow-on [#4564](https://github.com/esbmc/esbmc/issues/4564) and retired via [PR #4567](https://github.com/esbmc/esbmc/pull/4567). |
 | `@nki.jit` decorator | stripped at port time | (not an ESBMC issue) | `nki.jit` is just an unmodelled NKI symbol; decorators work fine end-to-end |
 
 So a kernel landed in the repo a few iterations ago looks substantially
 different from the same kernel now: the same control flow, the same
 index arithmetic, but the Python-level surface has converged on the
-upstream NKI form. No source rewrite remains active; the only residual
-concessions are two narrow Python frontend workarounds (named-local
-binding for compound scalar tuple-keys and for stubs-module calls on
-`Tile3D.__setitem__` RHS), filed as follow-on
-[#4564](https://github.com/esbmc/esbmc/issues/4564) to #4558.
+upstream NKI form. No source rewrite remains active and no residual
+workarounds remain in source — the kernels are byte-for-byte faithful
+to the upstream NKI form for indexing, accumulation, slicing, and
+control flow.
 
 ## Real upstream bug caught retroactively
 

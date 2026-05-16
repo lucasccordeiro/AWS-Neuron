@@ -237,11 +237,15 @@ three local conventions:
    tuple-keys on imported `Tile3D`/`Tile4D`): the 92 call sites across
    17 kernel files were converted to natural `t[k, r0:r1, c0:c1]` and
    `t[k0, k1, :, :]` indexing in one mechanical sweep and the six
-   helpers removed from `stubs.py`. Two narrow Python frontend
-   workarounds remain (named-local binding for compound-expression
-   scalar tuple-keys and for stubs-module calls on `Tile3D.__setitem__`
-   RHS), filed as follow-on
-   [esbmc/esbmc#4564](https://github.com/esbmc/esbmc/issues/4564).
+   helpers removed from `stubs.py`. The two narrow Python frontend
+   follow-ons surfaced during the sweep (named-local binding for
+   compound-expression scalar tuple-keys and for stubs-module calls on
+   `Tile3D.__setitem__` RHS) were filed as
+   [esbmc/esbmc#4564](https://github.com/esbmc/esbmc/issues/4564) and
+   retired via
+   [PR #4567](https://github.com/esbmc/esbmc/pull/4567): all 19
+   named-local bindings have since been inlined and the kernels are
+   byte-for-byte faithful to the upstream NKI form for indexing.
 
 For-loops are native (`for m in nl_affine_range(N):`); tuple
 destructuring is native (`M, N = a.shape`); the `nl_affine_range`
