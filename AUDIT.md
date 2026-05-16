@@ -502,6 +502,23 @@ F-02 / F-03's detection: if someone later removes the step_size assert
 without adding upstream-side validation, these tests catch the
 regression.
 
+### Phase-2 rediscovery (independent witness)
+
+The phase-2 safety-property run (`--overflow-check`, default div-by-
+zero) rediscovers F-02 / F-03 *without* relying on the port-time
+`assert step_size > 0`. The standalone target
+`audit15_hostarith_unguarded` reproduces only the upstream host-side
+trip-count expression — `((x_src - wdw_size) + step_size - 1) //
+step_size + 1` — and ESBMC's default integer division-by-zero check
+fires on the floor-div, producing a counterexample with
+`chunk_size = 1 → step_size = 0` (CWE-369). This is an independent
+witness for the same upstream bug: phase-1 catches it via the assert,
+phase-2 catches it via the safety property the assert was added to
+guard against. If the port-time precondition were dropped and the
+upstream kernel patched to validate `chunk_size >= 2` directly, the
+phase-2 target would shift to `SUCCESSFUL` — making it a faithful
+regression on the upstream fix rather than on our port deviation.
+
 ### Filed upstream?
 
 Reported as `aws-neuron/nki-samples` issue (pending). The upstream

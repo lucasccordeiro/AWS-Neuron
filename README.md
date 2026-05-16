@@ -6,10 +6,17 @@ can be partially verified by [ESBMC](https://github.com/esbmc/esbmc), using
 a thin Python stub library that models NKI tile shapes and bounds — without
 executing on a real NeuronCore.
 
-The verifier discharges shape and bounds preconditions on every NKI
-kernel call (partition-dim limits, in-bounds slicing, shape-equality on
-DMA / elementwise / matmul, hardware constraints on the matmul unit) and
-catches contract violations with precise counterexamples.
+The verifier runs in two phases:
+
+- **Phase 1 (default flags)** — shape and bounds contracts on every NKI
+  kernel call (partition-dim limits, in-bounds slicing, shape-equality on
+  DMA / elementwise / matmul, hardware constraints on the matmul unit),
+  via stub asserts. Contract violations surface as precise counterexamples.
+- **Phase 2 (`--overflow-check`, default div-by-zero)** — safety
+  properties on host-side index arithmetic. Signed-integer overflow and
+  integer division-by-zero, mapped to CWE-190 / CWE-369. Rediscovers the
+  upstream AUDIT-15 `ZeroDivisionError` on `chunk_size = 1` *without*
+  relying on the port-time precondition that currently guards it.
 
 ## What this looks like in practice
 
@@ -68,6 +75,7 @@ asserts the kernel's output contract.
 | `interpolate_trilinear_buggy` | `interpolate_trilinear_buggy.py` | `kernels/interpolate_trilinear_buggy.py` | `FAILED` |
 | `interpolate_bilinear_chunk1` | `interpolate_bilinear_chunk1.py` | `kernels/interpolate_bilinear.py` | `FAILED` — chunk_size=1 boundary input (AUDIT Finding 15) |
 | `interpolate_trilinear_chunk1` | `interpolate_trilinear_chunk1.py` | `kernels/interpolate_trilinear.py` | `FAILED` — same boundary as bilinear |
+| `audit15_hostarith_unguarded` | `audit15_hostarith_unguarded.py` | — (standalone) | phase-2 only: `FAILED` with `division by zero` (CWE-369) on the upstream trip-count expression at `chunk_size = 1` |
 | `matmul_basic` | `matmul_basic.py` | `kernels/matmul_basic.py` | `SUCCESSFUL` |
 | `matmul_basic_buggy` | `matmul_basic_buggy.py` | `kernels/matmul_basic_buggy.py` | `FAILED` |
 | `mamba_v1` | `mamba_v1.py` | `kernels/mamba_v1.py` | `SUCCESSFUL` |
@@ -114,9 +122,11 @@ upstream issues this PoC depends on (and the PRs that closed each one)
 is in `RETROSPECTIVE.md`.
 
 ```bash
-make verify              # run ESBMC on every target, tally results
-python3 verify.py NAME   # run a single target
-make dashboard           # rebuild dashboard.html from current data
+make verify                       # run both phases on every target, tally results
+python3 verify.py NAME            # run a single target (both phases if it opts into both)
+python3 verify.py --phase=1       # phase-1 only (shape and bounds)
+python3 verify.py --phase=2       # phase-2 only (safety properties)
+make dashboard                    # rebuild dashboard.html from current data
 ```
 
 [`dashboard.html`](dashboard.html) is a single self-contained HTML page
@@ -127,8 +137,10 @@ locally after `make dashboard` to see the current state of the PoC.
 
 Concrete-shape targets complete in 1–3 seconds wall-clock each on a
 stock laptop. The ten symbolic-shape targets run for ~5–90 seconds
-depending on the size of the shape family they sweep. The full suite
-(51 targets) finishes in about 5 minutes wall-clock end-to-end.
+depending on the size of the shape family they sweep. Phase-1 (51 runs)
+finishes in about 9 minutes; phase-2 (21 runs, concrete-shape good
+kernels + the AUDIT-15 reproducer) finishes in about 3 minutes; the
+combined two-phase sweep is ~12 minutes end-to-end.
 
 ## Where to read more
 

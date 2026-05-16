@@ -50,6 +50,8 @@ def categorise_target(name: str) -> str:
         return "historical"
     if name == "pipelined_attention":
         return "skeleton"
+    if name.startswith("audit"):
+        return "safety"
     return "concrete"
 
 
@@ -290,6 +292,7 @@ def render_html(manifest, issues: list[IssueRow],
     .kind.symbolic   { background: #dafbe1; color: #1a7f37; }
     .kind.historical { background: #ffd6e0; color: #a40e26; }
     .kind.skeleton   { background: #eee; color: #57606a; }
+    .kind.safety     { background: #fbe8d3; color: #b35900; }
     .status { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 3px; }
     .status.OPEN     { background: #ffefef; color: #cf222e; }
     .status.RESOLVED { background: #dafbe1; color: #1a7f37; }
@@ -322,26 +325,30 @@ def render_html(manifest, issues: list[IssueRow],
         '<span class="kind buggy">buggy</span> positive-control bug · '
         '<span class="kind symbolic">symbolic</span> bounded shape family · '
         '<span class="kind historical">historical</span> retroactive bug repro · '
-        '<span class="kind skeleton">skeleton</span> partial port'
+        '<span class="kind skeleton">skeleton</span> partial port · '
+        '<span class="kind safety">safety</span> phase-2 safety-property reproducer'
         '</div>'
     )
     target_rows: list[str] = []
     for t in manifest:
         kind = categorise_target(t.name)
         flags = " ".join(t.esbmc_args) if t.esbmc_args else ""
+        phase1 = t.expected if t.expected is not None else "—"
+        phase2 = t.safety_expected if t.safety_expected is not None else "—"
         target_rows.append(
             f'<tr>'
             f'<td><code>{html.escape(t.name)}</code></td>'
             f'<td><span class="kind {kind}">{kind}</span></td>'
             f'<td>{html.escape(kernel_family(t.name))}</td>'
-            f'<td><code>{html.escape(t.expected)}</code></td>'
+            f'<td><code>{html.escape(phase1)}</code></td>'
+            f'<td><code>{html.escape(phase2)}</code></td>'
             f'<td><code class="small">{html.escape(flags)}</code></td>'
             f'</tr>'
         )
     targets_html = (
         legend
         + '<table><thead><tr>'
-        + '<th>Target</th><th>Kind</th><th>Family</th><th>Expected</th><th>ESBMC flags</th>'
+        + '<th>Target</th><th>Kind</th><th>Family</th><th>Phase 1</th><th>Phase 2</th><th>ESBMC flags</th>'
         + '</tr></thead><tbody>'
         + "\n".join(target_rows)
         + '</tbody></table>'
