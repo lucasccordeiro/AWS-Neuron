@@ -196,7 +196,7 @@ more primitives is mechanical.
 ## Source-rewriting convention
 
 Each kernel is a near-verbatim port of the upstream NKI source under
-three local conventions:
+two local conventions:
 
 1. **Stub names instead of NKI imports.** `nl.affine_range` →
    `nl_affine_range`, `nisa.dma_copy` → `nisa_dma_copy`, etc. The NKI
@@ -204,56 +204,29 @@ three local conventions:
    identifier per NKI primitive.
 2. **`@nki.jit` decorator stripped.** Trivial — `nki.jit` is an
    unmodelled symbol, not an ESBMC limitation.
-3. **Tile slicing `a[i:j, k:l]` → natural Python.** **Retired** as of
-   PR [#4555](https://github.com/esbmc/esbmc/pull/4555) — the ninth
-   and final ESBMC fix in the slice-surface campaign. All 62
-   two-axis call sites now use natural-form subscript
-   `a[r0:r1, c0:c1]` / `a[:, c0:c1]` via `Tile.__getitem__`; the
-   `slice2d` and `slice_cols` free functions are gone from
-   `stubs.py`. The PR chain that unlocked this:
-   [#4522](https://github.com/esbmc/esbmc/pull/4522) (closing
-   [#4514](https://github.com/esbmc/esbmc/issues/4514)),
-   [#4528](https://github.com/esbmc/esbmc/pull/4528) (closing
-   [#4523](https://github.com/esbmc/esbmc/issues/4523)),
-   [#4538](https://github.com/esbmc/esbmc/pull/4538) (closing
-   [#4537](https://github.com/esbmc/esbmc/issues/4537)),
-   [#4540](https://github.com/esbmc/esbmc/pull/4540) (closing
-   [#4539](https://github.com/esbmc/esbmc/issues/4539)),
-   [#4544](https://github.com/esbmc/esbmc/pull/4544) (closing
-   [#4541](https://github.com/esbmc/esbmc/issues/4541)),
-   [#4549](https://github.com/esbmc/esbmc/pull/4549) (closing
-   [#4542](https://github.com/esbmc/esbmc/issues/4542)),
-   [#4551](https://github.com/esbmc/esbmc/pull/4551) (closing
-   [#4543](https://github.com/esbmc/esbmc/issues/4543)),
-   [#4553](https://github.com/esbmc/esbmc/pull/4553) (closing
-   [#4545](https://github.com/esbmc/esbmc/issues/4545)), and
-   [#4555](https://github.com/esbmc/esbmc/pull/4555) (closing
-   [#4554](https://github.com/esbmc/esbmc/issues/4554)).
-   The higher-arity slice forms (`slice_3d_at`,
-   `slice_4d_drop_d0_d1`, `slab_get`/`_set`,
-   `slab_cols_get`/`_set`) retired in turn with
-   [PR #4563](https://github.com/esbmc/esbmc/pull/4563) (closing
-   [#4558](https://github.com/esbmc/esbmc/issues/4558), variable-scalar
-   tuple-keys on imported `Tile3D`/`Tile4D`): the 92 call sites across
-   17 kernel files were converted to natural `t[k, r0:r1, c0:c1]` and
-   `t[k0, k1, :, :]` indexing in one mechanical sweep and the six
-   helpers removed from `stubs.py`. The two narrow Python frontend
-   follow-ons surfaced during the sweep (named-local binding for
-   compound-expression scalar tuple-keys and for stubs-module calls on
-   `Tile3D.__setitem__` RHS) were filed as
-   [esbmc/esbmc#4564](https://github.com/esbmc/esbmc/issues/4564) and
-   retired via
-   [PR #4567](https://github.com/esbmc/esbmc/pull/4567): all 19
-   named-local bindings have since been inlined and the kernels are
-   byte-for-byte faithful to the upstream NKI form for indexing.
 
-For-loops are native (`for m in nl_affine_range(N):`); tuple
-destructuring is native (`M, N = a.shape`); the `nl_affine_range`
-alias is read transparently from `stubs.py` with full
-iteration-count metadata; index arithmetic and control flow are
-byte-for-byte against the upstream sources. The history of which
-rewrites existed earlier and how each retired is in
-`RETROSPECTIVE.md`.
+Everything else is native Python against the upstream NKI source.
+Tile indexing — 2-D `a[r0:r1, c0:c1]`, 3-D `t[k, :, :]` /
+`t[k, r0:r1, c0:c1]`, 4-D `t[k0, k1, :, :]` — goes through
+`Tile.__getitem__` / `__setitem__` and the equivalents on `Tile3D` /
+`Tile4D`. For-loops are native (`for m in nl_affine_range(N):`);
+tuple destructuring is native (`M, N = a.shape`); the
+`nl_affine_range` alias is read transparently from `stubs.py` with
+full iteration-count metadata; index arithmetic and control flow are
+byte-for-byte against the upstream sources. No live workarounds remain.
+
+The chain of retired source rewrites and the ESBMC PRs that closed
+each is in
+[`RETROSPECTIVE.md`](RETROSPECTIVE.md#source-rewriting-history) —
+in summary, a nine-PR sequence for 2-D slicing
+([PR #4555](https://github.com/esbmc/esbmc/pull/4555) closing
+[#4554](https://github.com/esbmc/esbmc/issues/4554)),
+[PR #4563](https://github.com/esbmc/esbmc/pull/4563) closing
+[#4558](https://github.com/esbmc/esbmc/issues/4558) for the
+higher-arity 3-D / 4-D forms, and
+[PR #4567](https://github.com/esbmc/esbmc/pull/4567) closing
+[#4564](https://github.com/esbmc/esbmc/issues/4564) for the
+named-local follow-ons surfaced by the higher-arity sweep.
 
 ## Kernel coverage
 
