@@ -11,10 +11,11 @@ assumes familiarity with the verifier but not with NKI.
   shape-skeleton port only), 51 phase-1 build targets (concrete +
   positive-control + 10 symbolic-shape variants + 1 historical-bug
   reproduction + 1 shape-skeleton + 2 boundary-input regression
-  targets) + 21 phase-2 runs (concrete-shape good kernels with
-  `--overflow-check` + 1 host-arithmetic safety reproducer), 100 %
-  pass rate against expected verdicts; phase-1 finishes in about
-  9 minutes wall-clock, phase-2 in about 3 minutes, on Bitwuzla.
+  targets) + 31 phase-2 runs (every concrete- and symbolic-shape good
+  kernel with `--overflow-check`, plus the host-arithmetic safety
+  reproducer), 100 % pass rate against expected verdicts; phase-1
+  finishes in about 9 minutes wall-clock, phase-2 in about 6 minutes,
+  on Bitwuzla.
 - **Two verification phases**: phase-1 covers shape and bounds via
   stub asserts; phase-2 (`--overflow-check`, default div-by-zero)
   covers safety properties on host-side index arithmetic and
@@ -317,10 +318,14 @@ drifted between families (AUDIT.md Findings 1–7).
    catches it via a port-time `assert step_size > 0`, phase-2 catches
    it via div-by-zero on the floor-div the assert was added to guard.
    Two independent witnesses for the same upstream bug, with
-   non-overlapping failure modes for spurious-pass detection. The phase
+   non-overlapping failure modes for spurious-pass detection. Phase-2
+   extends cleanly to the symbolic-shape targets without any new
+   preconditions: the existing `__ESBMC_assume` bounds on each nondet
+   shape dimension are already tight enough that signed-integer
+   overflow is unreachable across the symbolic shape space. The phase
    split also keeps the manifest schema honest: phase-2-only targets
    (the host-arithmetic reproducer) and phase-2-skip targets
-   (symbolic-shape, historical-bug) are first-class in `verify.py`'s
+   (buggy variants, historical-bug) are first-class in `verify.py`'s
    `Target` rather than smuggled in as flag-mode rewrites of phase-1
    entries.
 

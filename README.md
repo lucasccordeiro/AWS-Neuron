@@ -138,9 +138,9 @@ locally after `make dashboard` to see the current state of the PoC.
 Concrete-shape targets complete in 1–3 seconds wall-clock each on a
 stock laptop. The ten symbolic-shape targets run for ~5–90 seconds
 depending on the size of the shape family they sweep. Phase-1 (51 runs)
-finishes in about 9 minutes; phase-2 (21 runs, concrete-shape good
-kernels + the AUDIT-15 reproducer) finishes in about 3 minutes; the
-combined two-phase sweep is ~12 minutes end-to-end.
+finishes in about 9 minutes; phase-2 (31 runs — every concrete- and
+symbolic-shape good kernel plus the AUDIT-15 reproducer) finishes in
+about 6 minutes; the combined two-phase sweep is ~15 minutes end-to-end.
 
 ## Where to read more
 
