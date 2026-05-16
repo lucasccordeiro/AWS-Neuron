@@ -49,12 +49,12 @@ def matmul_kernel(A_DRAM: Tile, B_DRAM: Tile,
                     n_start_a: int = n2 * TILES_IN_BLOCK_N * TILE_N
                     n_end_a: int   = n_start_a + TILES_IN_BLOCK_N * TILE_N
 
-                    slab_set(A_SBUF, k1,
-                             nl_load_2d(A_DRAM, k_start_a, k_end_a,
-                                                m_start_a, m_end_a))
-                    slab_set(B_SBUF, k1,
-                             nl_load_2d(B_DRAM, k_start_a, k_end_a,
-                                                n_start_a, n_end_a))
+                    a_tile: Tile = nl_load_2d(A_DRAM, k_start_a, k_end_a,
+                                                      m_start_a, m_end_a)
+                    A_SBUF[k1, :, :] = a_tile
+                    b_tile: Tile = nl_load_2d(B_DRAM, k_start_a, k_end_a,
+                                                      n_start_a, n_end_a)
+                    B_SBUF[k1, :, :] = b_tile
 
                 for m1 in nl_affine_range(TILES_IN_BLOCK_M):
                     for n1 in nl_affine_range(TILES_IN_BLOCK_N):
@@ -70,11 +70,11 @@ def matmul_kernel(A_DRAM: Tile, B_DRAM: Tile,
                         for k1b in nl_affine_range(TILES_IN_BLOCK_K):
                             iadd(Z_PSUM,
                                  ni_nc_matmul(
-                                     slab_cols_get(A_SBUF, k1b, m_start, m_end),
-                                     slab_cols_get(B_SBUF, k1b, n_start, n_end)))
+                                     A_SBUF[k1b, :, m_start:m_end],
+                                     B_SBUF[k1b, :, n_start:n_end]))
 
                         reduced: Tile = nl_loop_reduce(Z_PSUM, Z_DRAM.dtype)
-                        slab_cols_set(Z_SBUF, m1, n_start, n_end, reduced)
+                        Z_SBUF[m1, :, n_start:n_end] = reduced
 
 
             for m1b in nl_affine_range(TILES_IN_BLOCK_M):
@@ -83,7 +83,7 @@ def matmul_kernel(A_DRAM: Tile, B_DRAM: Tile,
                 n_start_s: int = n2 * TILES_IN_BLOCK_N * TILE_N
                 n_end_s: int   = n_start_s + TILES_IN_BLOCK_N * TILE_N
                 nl_store_2d(Z_DRAM, m_start_s, m_end_s, n_start_s, n_end_s,
-                            slab_get(Z_SBUF, m1b))
+                            Z_SBUF[m1b, :, :])
 
 
     return Z_DRAM

@@ -52,6 +52,58 @@ class Tile3D:
         self.dtype: int = dtype
         self.buffer: int = buffer
 
+    def __getitem__(self, key) -> "Tile":
+        """`t[k, sl1, sl2]` — leading scalar + two range axes, returning a Tile view.
+
+        `k` drops axis 0; `sl1` / `sl2` may be bare `:` or `a:b` slices
+        (resolved as in Tile.__getitem__, per esbmc/esbmc#4551). Use
+        `t[k, :, :]` for the full 2-D slab.
+        """
+        k: int   = key[0]
+        sl1: slice = key[1]
+        sl2: slice = key[2]
+        r0: int = sl1.start if sl1.start is not None else 0
+        r1: int = sl1.stop  if sl1.stop  is not None else self.d1
+        c0: int = sl2.start if sl2.start is not None else 0
+        c1: int = sl2.stop  if sl2.stop  is not None else self.d2
+        assert 0 <= k
+        assert k < self.d0
+        assert 0 <= r0
+        assert r0 <= r1
+        assert r1 <= self.d1
+        assert 0 <= c0
+        assert c0 <= c1
+        assert c1 <= self.d2
+        return Tile(r1 - r0, c1 - c0, self.dtype, self.buffer)
+
+    def __setitem__(self, key, value: "Tile") -> None:
+        """`t[k, sl1, sl2] = value` — same shape contract as __getitem__'s view.
+
+        Kernels currently bind the RHS to a named local before the
+        assignment when the RHS would be a direct stubs-module call
+        (e.g. `nl_load_2d(...)`); the equivalent inline form crashes
+        ESBMC's Python frontend with `Function … not found`. Tracked as
+        a follow-on to esbmc/esbmc#4558.
+        """
+        k: int   = key[0]
+        sl1: slice = key[1]
+        sl2: slice = key[2]
+        r0: int = sl1.start if sl1.start is not None else 0
+        r1: int = sl1.stop  if sl1.stop  is not None else self.d1
+        c0: int = sl2.start if sl2.start is not None else 0
+        c1: int = sl2.stop  if sl2.stop  is not None else self.d2
+        assert 0 <= k
+        assert k < self.d0
+        assert 0 <= r0
+        assert r0 <= r1
+        assert r1 <= self.d1
+        assert 0 <= c0
+        assert c0 <= c1
+        assert c1 <= self.d2
+        assert value.d0 == (r1 - r0)
+        assert value.d1 == (c1 - c0)
+        assert value.dtype == self.dtype
+
 class Tile4D:
     """Rank-4 tile: shape (d0, d1, d2, d3). d0 is the partition axis."""
     def __init__(self, d0: int, d1: int, d2: int, d3: int, dtype: int, buffer: int):
@@ -62,6 +114,22 @@ class Tile4D:
         self.shape: tuple = (d0, d1, d2, d3)
         self.dtype: int = dtype
         self.buffer: int = buffer
+
+    def __getitem__(self, key) -> "Tile":
+        """`t[k0, k1, :, :]` — drop two leading scalar axes, returning a 2-D view.
+
+        Used by v3-style attention where qk is held as a 4-D HBM tensor
+        and the per-(i, j) slot is read or written as a 2-D tile. The
+        trailing axes are bare `:` only; arbitrary range slicing is not
+        in scope (no kernel uses it).
+        """
+        k0: int = key[0]
+        k1: int = key[1]
+        assert 0 <= k0
+        assert k0 < self.d0
+        assert 0 <= k1
+        assert k1 < self.d1
+        return Tile(self.d2, self.d3, self.dtype, self.buffer)
 
 class Tile5D:
     """Rank-5 tile: shape (d0, d1, d2, d3, d4). Produced by tile3d_ap_5d
@@ -170,42 +238,6 @@ def nl_store_2d(dst: Tile, r0: int, r1: int, c0: int, c1: int,
     assert (r1 - r0) == value.d0
     assert (c1 - c0) == value.d1
 
-# ============================================================== 3-D indexing
-
-# T3D[k] — select k-th 2-D slab; (slabs, par_dim, free) -> (par_dim, free).
-def slab_get(t: Tile3D, k: int) -> Tile:
-    assert 0 <= k
-    assert k < t.d0
-    return Tile(t.d1, t.d2, t.dtype, t.buffer)
-
-# T3D[k] = value — overwrite k-th slab; shape and dtype must match.
-def slab_set(t: Tile3D, k: int, value: Tile) -> None:
-    assert 0 <= k
-    assert k < t.d0
-    assert value.d0 == t.d1
-    assert value.d1 == t.d2
-    assert value.dtype == t.dtype
-
-# T3D[k, :, c0:c1] — slab + column-strip.
-def slab_cols_get(t: Tile3D, k: int, c0: int, c1: int) -> Tile:
-    assert 0 <= k
-    assert k < t.d0
-    assert 0 <= c0
-    assert c0 <= c1
-    assert c1 <= t.d2
-    return Tile(t.d1, c1 - c0, t.dtype, t.buffer)
-
-# T3D[k, :, c0:c1] = value — write a column-strip into a slab.
-def slab_cols_set(t: Tile3D, k: int, c0: int, c1: int, value: Tile) -> None:
-    assert 0 <= k
-    assert k < t.d0
-    assert 0 <= c0
-    assert c0 <= c1
-    assert c1 <= t.d2
-    assert value.d0 == t.d1
-    assert value.d1 == (c1 - c0)
-    assert value.dtype == t.dtype
-
 # ============================================================== ISA operations
 
 # nisa.dma_copy(dst, src): shapes must match. Dtype need not — like
@@ -234,19 +266,6 @@ def nisa_tensor_tensor(dst: Tile, a: Tile, b: Tile) -> None:
     assert a.d0  == b.d0
     assert dst.d1 == a.d1
     assert a.d1  == b.d1
-
-# 3-D tensor slice with one scalar axis and two range axes:
-#   src[i, r0:r1, c0:c1]  (scalar i drops axis 0; result is 2-D)
-def slice_3d_at(src: Tile3D, i: int, r0: int, r1: int, c0: int, c1: int) -> Tile:
-    assert 0 <= i
-    assert i < src.d0
-    assert 0 <= r0
-    assert r0 <= r1
-    assert r1 <= src.d1
-    assert 0 <= c0
-    assert c0 <= c1
-    assert c1 <= src.d2
-    return Tile(r1 - r0, c1 - c0, src.dtype, src.buffer)
 
 # nl.broadcast_to(src, (new_d0, new_d1)) — each source dim must either match
 # or be 1. The 1-dim is replicated to the new size.
@@ -766,21 +785,11 @@ def nisa_nc_transpose(dst: Tile, data: Tile) -> None:
     assert dst.d1 == data.d0
     assert dst.buffer == BUF_PSUM
 
-# t[k0, k1, :, :] — drop the first two scalar indices of a 4-D tile.
-# Returns a 2-D view of shape (t.d2, t.d3). Used by v3-style attention
-# where qk is held as a 4-D (q_tiles, kv_tiles, PMAX, FMAX_MOVING) HBM
-# tensor and the per-(i, j) slot is read or written as a 2-D tile.
-def slice_4d_drop_d0_d1(t: Tile4D, k0: int, k1: int) -> Tile:
-    assert 0 <= k0
-    assert k0 < t.d0
-    assert 0 <= k1
-    assert k1 < t.d1
-    return Tile(t.d2, t.d3, t.dtype, t.buffer)
-
 # nl.load(src[k]) — load the k-th 2-D slab of a 3-D HBM tile into SBUF.
-# Combines slab_get + nisa.dma_copy into one call, matching the upstream
-# `nl.load(t[k])` idiom. The slab's leading axis (src.d1) becomes the
-# SBUF partition dim and must fit in PMAX (AUDIT Finding 14).
+# Combines the slab view `src[k, :, :]` with nisa.dma_copy into one call,
+# matching the upstream `nl.load(t[k])` idiom. The slab's leading axis
+# (src.d1) becomes the SBUF partition dim and must fit in PMAX (AUDIT
+# Finding 14).
 def nl_load_3d_slot(src: Tile3D, k: int) -> Tile:
     assert 0 <= k
     assert k < src.d0
@@ -797,8 +806,8 @@ def nl_store_3d_slot(dst: Tile3D, k: int, value: Tile) -> None:
 
 # nl.load(src[i, r0:r1, c0:c1]) — load a 3-D slice into SBUF. The scalar
 # axis is dropped; the range axes become the result's (d0, d1). Combines
-# slice_3d_at + nisa.dma_copy. Returned partition dim (r1 - r0) must fit
-# in PMAX (AUDIT Finding 14).
+# the `src[i, r0:r1, c0:c1]` view with nisa.dma_copy. Returned partition
+# dim (r1 - r0) must fit in PMAX (AUDIT Finding 14).
 def nl_load_3d_at(src: Tile3D, i: int, r0: int, r1: int,
                   c0: int, c1: int) -> Tile:
     assert 0 <= i
