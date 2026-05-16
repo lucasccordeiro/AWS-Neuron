@@ -240,7 +240,8 @@ three local conventions:
    helpers removed from `stubs.py`. Two narrow Python frontend
    workarounds remain (named-local binding for compound-expression
    scalar tuple-keys and for stubs-module calls on `Tile3D.__setitem__`
-   RHS), filed as a new follow-on.
+   RHS), filed as follow-on
+   [esbmc/esbmc#4564](https://github.com/esbmc/esbmc/issues/4564).
 
 For-loops are native (`for m in nl_affine_range(N):`); tuple
 destructuring is native (`M, N = a.shape`); the `nl_affine_range`
@@ -287,7 +288,8 @@ Tutorials covered:
   contracts being too strict).
 - `tutorials/fused_mamba` — all three published variants:
   `mamba_v1` (introduced `nisa.activation`, `nl.broadcast_to`,
-  `nisa.tensor_tensor_scan`, `slice_3d_at`), `mamba_v2` (hoists
+  `nisa.tensor_tensor_scan`, and the `Tile3D.__getitem__`
+  `t[i, r0:r1, c0:c1]` form), `mamba_v2` (hoists
   delta/u loads out of the state loop), `mamba_v3` (adds an inner
   seq-tile loop with column-strip slicing into existing SBUF tiles
   and a `scan_init` accumulator carried across seq tiles).
@@ -311,8 +313,9 @@ Tutorials covered:
   shapes);
   `attn_fwd_v3` (large-sequence asymmetric blocked: 4-D `qk` HBM
   tile, softmax streamed through 3-D HBM tiles, transpose-via-PSUM,
-  blocked matmul accumulator; introduces `slice_4d_drop_d0_d1`,
-  `nl_load_3d_slot` / `nl_store_3d_slot`, `nl_load_3d_at`; extended
+  blocked matmul accumulator; introduces `Tile4D.__getitem__`
+  (`t[k0, k1, :, :]`), `nl_load_3d_slot` / `nl_store_3d_slot`,
+  `nl_load_3d_at`; extended
   Finding 12 sweep to `nl_store_2d`; **closes AUDIT-13 operand-swap
   blind spot** — the v3 buggy variant injects exactly that swap and is
   correctly rejected by `a.d1 <= GEMM_STATIONARY_FMAX`, demonstrating
