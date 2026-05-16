@@ -8,13 +8,25 @@ assumes familiarity with the verifier but not with NKI.
 
 - **19 NKI kernel functions ported** (across 11 upstream source files —
   6 tutorials, 5 community-`contributed/` kernels, one of which is a
-  shape-skeleton port only), 51 build targets (concrete +
+  shape-skeleton port only), 51 phase-1 build targets (concrete +
   positive-control + 10 symbolic-shape variants + 1 historical-bug
   reproduction + 1 shape-skeleton + 2 boundary-input regression
-  targets), 100 % pass rate against expected verdicts; full regression
-  in about 5 minutes wall-clock on Bitwuzla.
-- **6 ESBMC Python-frontend issues filed upstream**, 2 already
-  fixed-and-merged (#4509, #4510). 4 still open (#4513–#4516).
+  targets) + 21 phase-2 runs (concrete-shape good kernels with
+  `--overflow-check` + 1 host-arithmetic safety reproducer), 100 %
+  pass rate against expected verdicts; phase-1 finishes in about
+  9 minutes wall-clock, phase-2 in about 3 minutes, on Bitwuzla.
+- **Two verification phases**: phase-1 covers shape and bounds via
+  stub asserts; phase-2 (`--overflow-check`, default div-by-zero)
+  covers safety properties on host-side index arithmetic and
+  independently rediscovers AUDIT-15 F-02 / F-03 via the standalone
+  `audit15_hostarith_unguarded` target — a counterexample with
+  `chunk_size = 1 → step_size = 0` on the upstream trip-count
+  expression, CWE-369, with no port-time precondition in the path.
+- **~20 ESBMC Python-frontend issues filed upstream**, all but
+  [#4558](https://github.com/esbmc/esbmc/issues/4558) (variable-scalar
+  in arity-≥3 tuple-key on imported `Tile3D`/`Tile4D`) resolved
+  in-tree. See the *Upstream issues filed* table below for the full
+  ledger.
 - **1 real upstream bug caught retroactively** —
   [aws-neuron/nki-samples#74](https://github.com/aws-neuron/nki-samples/pull/74)
   (pre-fix `nki_matmul_hoist_load_` allocated lhsT slab with the wrong
@@ -292,6 +304,25 @@ drifted between families (AUDIT.md Findings 1–7).
    silently saying SUCCESSFUL because nothing checks anything. Several
    of our most useful AUDIT findings were exposed precisely because a
    buggy variant unexpectedly verified — i.e. the stubs were lying.
+
+6. **Two-phase verification.** Phase-1 runs default ESBMC and discharges
+   shape-and-bounds contracts via stub asserts. Phase-2 runs
+   `--overflow-check` (and ESBMC's default integer division-by-zero
+   check) over the same entry scripts to discharge safety properties on
+   host-side index arithmetic. The two phases are independent: phase-1
+   catches contract bugs the stubs encode; phase-2 catches the class of
+   bugs that look like Python integer arithmetic gone wrong (overflow,
+   div-by-zero) and is *not* mediated by the stub library at all. The
+   AUDIT-15 host-arithmetic reproducer is the clean demo — phase-1
+   catches it via a port-time `assert step_size > 0`, phase-2 catches
+   it via div-by-zero on the floor-div the assert was added to guard.
+   Two independent witnesses for the same upstream bug, with
+   non-overlapping failure modes for spurious-pass detection. The phase
+   split also keeps the manifest schema honest: phase-2-only targets
+   (the host-arithmetic reproducer) and phase-2-skip targets
+   (symbolic-shape, historical-bug) are first-class in `verify.py`'s
+   `Target` rather than smuggled in as flag-mode rewrites of phase-1
+   entries.
 
 ## What's still out of scope
 
