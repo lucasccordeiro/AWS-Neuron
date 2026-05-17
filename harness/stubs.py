@@ -1172,3 +1172,19 @@ def nisa_activation_reduce(data: Tile, bias: Tile, reduce_res: Tile) -> Tile:
     assert reduce_res.d0 == data.d0
     assert reduce_res.d1 == 1
     return Tile(data.d0, data.d1, data.dtype, BUF_SBUF)
+
+# ============================================================== tp fancy indexing
+
+# Tile5D plane slice with par-axis-first layout: drop the three scalar
+# middle axes at positions (k1, k2, k3), returning a Tile view of
+# (d0, d4). Models the upstream's `tp_psum[grp_i, si, tp_grp]`
+# shorthand (which drops three leading scalar axes on the upstream's
+# par_dim-fourth layout).
+def nl_slice_5d_drop_d1d2d3(src: Tile5D, k1: int, k2: int, k3: int) -> Tile:
+    assert 0 <= k1
+    assert k1 < src.d1
+    assert 0 <= k2
+    assert k2 < src.d2
+    assert 0 <= k3
+    assert k3 < src.d3
+    return Tile(src.d0, src.d4, src.dtype, src.buffer)
