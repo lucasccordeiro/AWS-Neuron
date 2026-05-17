@@ -1130,3 +1130,45 @@ def ni_activation(data: Tile, bias: Tile) -> Tile:
     assert bias.d0 == data.d0
     assert bias.d1 == data.d1 or bias.d1 == 1
     return Tile(data.d0, data.d1, data.dtype, data.buffer)
+
+# ============================================================== exp fancy indexing
+
+# Tile4D fancy load with par-axis-first layout: IndexTensor on d0
+# (par_dim), two scalar middle axes (d1, d2), IndexTensor on d3 (free
+# axis). Read-direction mirror of nl_store_4d_fancy_par_first. Used for
+# `mhlo_mul_2[ip_p, grp_i, si, access_n*pi+ip_n]` as the data argument
+# to nisa.activation_reduce.
+def nl_load_4d_fancy_par_first(src: Tile4D,
+                                ax_p: IndexTensor,
+                                k1: int, k2: int,
+                                ax_f: IndexTensor) -> Tile:
+    p: int = nondet_int()
+    f: int = nondet_int()
+    __ESBMC_assume(ax_p.low <= p)
+    __ESBMC_assume(p < ax_p.high)
+    __ESBMC_assume(ax_f.low <= f)
+    __ESBMC_assume(f < ax_f.high)
+    assert 0 <= p
+    assert p < src.d0
+    assert 0 <= k1
+    assert k1 < src.d1
+    assert 0 <= k2
+    assert k2 < src.d2
+    assert 0 <= f
+    assert f < src.d3
+    return Tile(ax_p.high - ax_p.low, ax_f.high - ax_f.low,
+                src.dtype, src.buffer)
+
+# nisa.activation_reduce(op, data, reduce_op=add, reduce_res=column_slot,
+#   bias=column_vec) — applies an elementwise activation (with optional
+# bias broadcasting along the free dim) to `data`, returns the result
+# tile, and writes the axis-1 reduction (`reduce_op`) into `reduce_res`.
+# The activation op (np.exp etc.) and the reduce_op do not enter the
+# shape contract. `bias` matches data on d0 and broadcasts on d1;
+# `reduce_res` must be the (data.d0, 1) column-vector view.
+def nisa_activation_reduce(data: Tile, bias: Tile, reduce_res: Tile) -> Tile:
+    assert bias.d0 == data.d0
+    assert bias.d1 == data.d1 or bias.d1 == 1
+    assert reduce_res.d0 == data.d0
+    assert reduce_res.d1 == 1
+    return Tile(data.d0, data.d1, data.dtype, BUF_SBUF)
