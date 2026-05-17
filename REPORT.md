@@ -343,10 +343,12 @@ Deferred:
   infrastructure introduced during the `load_q` port: `nl_mgrid_2d`
   (2-D `nl.mgrid` returning two IndexTensors), `nl_load_3d_fancy` and
   `nl_store_3d_fancy` (3-D load/store with scalar + IndexTensor mixed
-  indexing). Nested function definitions verified to work in ESBMC's
-  Python frontend; cross-module class-instance captures require the
-  explicit-parameter rewrite documented in
-  [esbmc/esbmc#4572](https://github.com/esbmc/esbmc/issues/4572).
+  indexing). Nested function definitions with cross-module class-
+  instance captures are resolved by ESBMC's Python frontend after
+  [esbmc/esbmc#4578](https://github.com/esbmc/esbmc/pull/4578) (fixes
+  [#4572](https://github.com/esbmc/esbmc/issues/4572)) added the
+  enclosing-function fallback to closure type inference; `load_q`
+  closes over its captures directly, matching the upstream signature.
   The six remaining inner helpers (`qk_and_max` / `update_max` / `exp`
   / `tp` / `pv` / `write_back`) are still unmodelled — extending
   requires custom `sb_mod(base_addr=, num_free_tiles=)` and
