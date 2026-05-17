@@ -1188,3 +1188,54 @@ def nl_slice_5d_drop_d1d2d3(src: Tile5D, k1: int, k2: int, k3: int) -> Tile:
     assert 0 <= k3
     assert k3 < src.d3
     return Tile(src.d0, src.d4, src.dtype, src.buffer)
+
+# ============================================================== pv fancy indexing
+
+# Tile5D fancy load with par-axis-first layout: IndexTensor on d0
+# (par_dim), three scalar middle axes (d1, d2, d3), IndexTensor on d4
+# (free axis). Read-direction mirror of nl_store_5d_fancy_par_first.
+# Used for `tp_sbuf[ip_mm2, grp_i, mm2i, tp_grp_i, mm2_si*128 + if_mm2]`
+# as the first operand to nisa.nc_matmul.
+def nl_load_5d_fancy_par_first(src: Tile5D,
+                                ax_p: IndexTensor,
+                                k1: int, k2: int, k3: int,
+                                ax_f: IndexTensor) -> Tile:
+    p: int = nondet_int()
+    f: int = nondet_int()
+    __ESBMC_assume(ax_p.low <= p)
+    __ESBMC_assume(p < ax_p.high)
+    __ESBMC_assume(ax_f.low <= f)
+    __ESBMC_assume(f < ax_f.high)
+    assert 0 <= p
+    assert p < src.d0
+    assert 0 <= k1
+    assert k1 < src.d1
+    assert 0 <= k2
+    assert k2 < src.d2
+    assert 0 <= k3
+    assert k3 < src.d3
+    assert 0 <= f
+    assert f < src.d4
+    return Tile(ax_p.high - ax_p.low, ax_f.high - ax_f.low,
+                src.dtype, src.buffer)
+
+# Tile4D plane slice with par-axis-first layout: drop two scalar middle
+# axes at positions (k1, k2), returning a Tile view of (d0, d3). Models
+# the upstream's `mm2_psum[grp_i, mm2i]` shorthand (which drops two
+# leading scalar axes on the upstream's par_dim-third layout).
+def nl_slice_4d_drop_d1d2(src: Tile4D, k1: int, k2: int) -> Tile:
+    assert 0 <= k1
+    assert k1 < src.d1
+    assert 0 <= k2
+    assert k2 < src.d2
+    return Tile(src.d0, src.d3, src.dtype, src.buffer)
+
+# Tile3D plane store with par-axis-first layout: write a 2-D (d0, d2)
+# value into the (d0, k, d2) plane at scalar middle axis k. Mirror of
+# nl_slice_3d_drop_d1 for the store direction. Used for
+# `mm2_sbuf[ip_mm2, grp_i, if_mm2] = nl.loop_reduce(...)`.
+def nl_store_3d_drop_d1(dst: Tile3D, k: int, value: Tile) -> None:
+    assert 0 <= k
+    assert k < dst.d1
+    assert value.d0 == dst.d0
+    assert value.d1 == dst.d2

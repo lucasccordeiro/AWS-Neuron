@@ -336,7 +336,7 @@ Deferred:
   the basic softmax-chain prerequisite, but pipelining and producer/
   consumer queues are still unmodelled.
 - `contributed/pipelined_attention.py` — Flash Attention with software
-  pipelining. **Six partial ports landed**: `flash_fwd_shell` verifies
+  pipelining. **Seven partial ports landed**: `flash_fwd_shell` verifies
   the top-level I/O contract and the outer running-statistic SBUF
   buffer shapes, `flash_fwd_load_q_only` adds `load_q`,
   `flash_fwd_qk_and_max_only` adds `qk_and_max` (per-(grp_i, si, pi)
@@ -348,12 +348,16 @@ Deferred:
   `flash_fwd_exp_only` adds `exp` (per-(grp_i, si, pi)
   `nisa.activation_reduce` of `mhlo_mul_2` with `running_max` bias,
   writing `exp6_sbuf` and the axis-1 sum into `final_reduce_sum_b`),
-  and `flash_fwd_tp_only` adds `tp` (per-(grp_i, si, tp_grp, ti)
+  `flash_fwd_tp_only` adds `tp` (per-(grp_i, si, tp_grp, ti)
   `nisa.nc_matmul(exp6_sbuf_slab, identity_load)` for the
   transpose-by-identity matmul into a 5-D `tp_psum`, followed by a
   per-tp_grp `nisa.tensor_copy` cast to a 5-D bfloat16 SBUF
-  `tp_sbuf`). Stub infrastructure introduced: `nl_mgrid_2d` (2-D
-  `nl.mgrid` returning two IndexTensors), `nl_load_3d_fancy` and
+  `tp_sbuf`), and `flash_fwd_pv_only` adds `pv` (per-(grp_i, mm2i,
+  tp_grp_i, mm2_si) `nisa.nc_matmul(tp_sbuf_slab, v_loaded_slab)`
+  accumulating into a 4-D `mm2_psum`, followed by a per-mm2i
+  `nl.loop_reduce` across the 2048-tile axis into a 3-D `mm2_sbuf`).
+  Stub infrastructure introduced: `nl_mgrid_2d` (2-D `nl.mgrid`
+  returning two IndexTensors), `nl_load_3d_fancy` and
   `nl_store_3d_fancy` (3-D load/store with scalar + IndexTensor mixed
   indexing); for `qk_and_max`, the par-axis-first fancy stores
   `nl_store_5d_fancy_par_first` and `nl_store_4d_fancy_par_first`,
@@ -368,20 +372,25 @@ Deferred:
   `nisa_activation_reduce` (elementwise activation with bias and
   axis-1 reduce_res); for `tp`, the par-axis-first 5-D plane slice
   `nl_slice_5d_drop_d1d2d3` consumed alongside the existing
-  `ni_nc_matmul` and `ni_tensor_copy` value-returning ISA forms.
+  `ni_nc_matmul` and `ni_tensor_copy` value-returning ISA forms; for
+  `pv`, the par-axis-first 5-D fancy load `nl_load_5d_fancy_par_first`,
+  the Tile4D middle-axes plane slice `nl_slice_4d_drop_d1d2`, and the
+  Tile3D middle-axis plane store `nl_store_3d_drop_d1`.
   Nested function definitions with cross-module class-instance
   captures are resolved by ESBMC's Python frontend after
   [esbmc/esbmc#4578](https://github.com/esbmc/esbmc/pull/4578) (fixes
   [#4572](https://github.com/esbmc/esbmc/issues/4572)) added the
-  enclosing-function fallback to closure type inference; all five
+  enclosing-function fallback to closure type inference; all six
   nested helpers close over their captures directly, matching the
   upstream signatures. The par_dim axis is hoisted to d0 in every
   multi-D tile (`mm1_psum_dot`, `mhlo_mul_2`, `temp_reduce14_sbuf`,
   `final_reduce_max`, `prev_running_max`, `scaling_factor`,
-  `exp6_sbuf`, `final_reduce_sum_b`, `tp_psum`, `tp_sbuf`) to match
-  the Tile5D / Tile4D / Tile3D convention — shape contract identical
-  to the upstream `nl.par_dim(128)` annotation. The two remaining
-  inner helpers (`pv` / `write_back`) are still unmodelled —
+  `exp6_sbuf`, `final_reduce_sum_b`, `tp_psum`, `tp_sbuf`, `mm2_psum`,
+  `mm2_sbuf`) to match the Tile5D / Tile4D / Tile3D convention —
+  shape contract identical to the upstream `nl.par_dim(128)`
+  annotation. `v_loaded` keeps the upstream par_dim-on-d1 layout so
+  the existing `nl_load_3d_fancy` reader applies unchanged. The one
+  remaining inner helper (`write_back`) is still unmodelled —
   extending requires custom `sb_mod(base_addr=, num_free_tiles=)` and
   `psum.alloc(<callback>)` allocators (currently stripped to plain
   `BUF_SBUF`/`BUF_PSUM`), `par_dim(n)` shape-tuple wrappers (currently
