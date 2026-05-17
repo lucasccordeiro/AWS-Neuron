@@ -814,6 +814,59 @@ def nl_load_3d_at(src: Tile3D, i: int, r0: int, r1: int,
     assert (r1 - r0) <= PMAX
     return Tile(r1 - r0, c1 - c0, src.dtype, BUF_SBUF)
 
+# nl.mgrid[p_lo:p_hi, f_lo:f_hi] — two index tensors returned as a
+# pair, intended for `iq_p, iq_f = nl_mgrid_2d(...)` destructure.
+def nl_mgrid_2d(p_lo: int, p_hi: int, f_lo: int, f_hi: int) -> tuple:
+    assert p_lo <= p_hi
+    assert f_lo <= f_hi
+    return (IndexTensor(p_lo, p_hi), IndexTensor(f_lo, f_hi))
+
+# nl.load(src[k, ax1, ax2]) — 3-D fancy load with one scalar leading
+# axis and two IndexTensor trailing axes. Bound checks are performed on
+# nondet representative elements of the IndexTensors (same idiom as the
+# masked-load family above). Returns a 2-D SBUF tile whose dimensions
+# are the IndexTensor extents (`ax1.high - ax1.low`, `ax2.high - ax2.low`).
+# The partition-axis extent must fit in PMAX (AUDIT Finding 14).
+def nl_load_3d_fancy(src: Tile3D, k: int,
+                     ax1: IndexTensor, ax2: IndexTensor) -> Tile:
+    assert 0 <= k
+    assert k < src.d0
+    m: int = nondet_int()
+    o: int = nondet_int()
+    __ESBMC_assume(ax1.low <= m)
+    __ESBMC_assume(m < ax1.high)
+    __ESBMC_assume(ax2.low <= o)
+    __ESBMC_assume(o < ax2.high)
+    assert 0 <= m
+    assert m < src.d1
+    assert 0 <= o
+    assert o < src.d2
+    p_extent: int = ax1.high - ax1.low
+    f_extent: int = ax2.high - ax2.low
+    assert p_extent <= PMAX
+    return Tile(p_extent, f_extent, src.dtype, BUF_SBUF)
+
+# nl.store(dst[k, ax1, ax2], value) modelled as a free function: 3-D
+# fancy store with one scalar leading axis, two IndexTensor trailing
+# axes, and a 2-D SBUF source. Shape contract mirrors nl_load_3d_fancy.
+def nl_store_3d_fancy(dst: Tile3D, k: int,
+                      ax1: IndexTensor, ax2: IndexTensor,
+                      value: Tile) -> None:
+    assert 0 <= k
+    assert k < dst.d0
+    m: int = nondet_int()
+    o: int = nondet_int()
+    __ESBMC_assume(ax1.low <= m)
+    __ESBMC_assume(m < ax1.high)
+    __ESBMC_assume(ax2.low <= o)
+    __ESBMC_assume(o < ax2.high)
+    assert 0 <= m
+    assert m < dst.d1
+    assert 0 <= o
+    assert o < dst.d2
+    assert value.d0 == (ax1.high - ax1.low)
+    assert value.d1 == (ax2.high - ax2.low)
+
 # ============================================================== 5-D views (.ap)
 
 # Allocation for 5-D tiles. d0 is the partition axis.

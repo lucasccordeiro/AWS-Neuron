@@ -114,6 +114,7 @@ asserts the kernel's output contract.
 | `attn_fwd_v3_buggy` | `attn_fwd_v3_buggy.py` | `kernels/attn_fwd_v3_buggy.py` | `FAILED` (`--unwind 5`) |
 | `attn_fwd_v3_symbolic` | `attn_fwd_v3_symbolic.py` | `kernels/attn_fwd_v3.py` | `SUCCESSFUL` (`--unwind 9`; SEQLEN ∈ {512, 1024}) |
 | `pipelined_attention` | `pipelined_attention.py` | `kernels/pipelined_attention.py` | `SUCCESSFUL` (shape-skeleton only; inner Flash Attention pipeline deferred — see ROADMAP) |
+| `pipelined_attention_load_q` | `pipelined_attention_load_q.py` | `kernels/pipelined_attention.py` | `SUCCESSFUL` (shape skeleton + upstream `load_q` inner helper; six remaining inner helpers deferred — see ROADMAP) |
 
 `verify.py` is the single source of truth for these pairings, the ESBMC
 flags, and the expected verdicts.
@@ -142,8 +143,8 @@ Concrete-shape targets complete in 1–3 seconds wall-clock each on a
 stock laptop. The thirteen symbolic-shape targets run for ~5–90
 seconds depending on the size of the shape family they sweep —
 eleven of the thirteen `--unwind` values are k-induction-certified
-complete (see `REPORT.md` for the table). Phase-1 (54 runs) finishes
-in about 9 minutes; phase-2 (34 runs — every concrete- and
+complete (see `REPORT.md` for the table). Phase-1 (55 runs) finishes
+in about 9 minutes; phase-2 (35 runs — every concrete- and
 symbolic-shape good kernel plus the AUDIT-15 reproducer) finishes in
 about 6 minutes; the combined two-phase sweep is ~15 minutes end-to-end.
 

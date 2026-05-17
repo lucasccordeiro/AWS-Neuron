@@ -336,23 +336,28 @@ Deferred:
   the basic softmax-chain prerequisite, but pipelining and producer/
   consumer queues are still unmodelled.
 - `contributed/pipelined_attention.py` — Flash Attention with software
-  pipelining. **Shape-skeleton port landed**: `flash_fwd_shell`
-  verifies the kernel's top-level I/O contract and the outer
-  running-statistic SBUF buffer shapes. The inner attention pipeline
-  (`load_q` / `qk_and_max` / `update_max` / `exp` / `tp` / `pv` /
-  `write_back`) is not yet modelled — extending requires custom
-  `sb_mod(base_addr=, num_free_tiles=)` and `psum.alloc(<callback>)`
-  allocators (currently stripped to plain `BUF_SBUF`/`BUF_PSUM`),
-  `par_dim(n)` shape-tuple wrappers (currently dropped), nested
-  function definitions (untested in ESBMC), 2-D `nl.mgrid` with
-  multi-return destructure, 3-D fancy load with mixed scalar +
-  IndexTensor + arithmetic indexing (related to ESBMC issue #4542),
-  5-D and 6-D allocations, and `nl.program_id` / `nl.shared_constant` /
-  `@nki.baremetal`. The 16K seqlen also produces large nested loop
-  counts (128, 64, 16, 4); the toy-shape port uses seqlen 2048 to
-  keep BMC unwinding feasible while preserving the divisibility
-  chain (seqlen_q % section_len == 0, section_len % 2048 == 0,
-  section_len % 512 == 0, section_len % 128 == 0).
+  pipelining. **Two partial ports landed**: `flash_fwd_shell` verifies
+  the top-level I/O contract and the outer running-statistic SBUF
+  buffer shapes, and `flash_fwd_load_q_only` adds the upstream `load_q`
+  inner helper executed once per group per section. New stub
+  infrastructure introduced during the `load_q` port: `nl_mgrid_2d`
+  (2-D `nl.mgrid` returning two IndexTensors), `nl_load_3d_fancy` and
+  `nl_store_3d_fancy` (3-D load/store with scalar + IndexTensor mixed
+  indexing). Nested function definitions verified to work in ESBMC's
+  Python frontend; cross-module class-instance captures require the
+  explicit-parameter rewrite documented in
+  [esbmc/esbmc#4572](https://github.com/esbmc/esbmc/issues/4572).
+  The six remaining inner helpers (`qk_and_max` / `update_max` / `exp`
+  / `tp` / `pv` / `write_back`) are still unmodelled — extending
+  requires custom `sb_mod(base_addr=, num_free_tiles=)` and
+  `psum.alloc(<callback>)` allocators (currently stripped to plain
+  `BUF_SBUF`/`BUF_PSUM`), `par_dim(n)` shape-tuple wrappers (currently
+  dropped), 5-D and 6-D allocations, and `nl.program_id` /
+  `nl.shared_constant` / `@nki.baremetal`. The 16K seqlen also produces
+  large nested loop counts (128, 64, 16, 4); the toy-shape port uses
+  seqlen 2048 to keep BMC unwinding feasible while preserving the
+  divisibility chain (seqlen_q % section_len == 0, section_len % 2048
+  == 0, section_len % 512 == 0, section_len % 128 == 0).
 - `tutorials/mxfp-matmul` — Microscaled-FP quantization; dtype-heavy
   and shape-light, so verification depth is low for this PoC's model.
 
