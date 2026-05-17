@@ -150,6 +150,7 @@ MANIFEST: list[Target] = [
     Target("attn_fwd_v3_symbolic",       "attn_fwd_v3_symbolic.py",              ("--unwind", "9"), "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("pipelined_attention",        "pipelined_attention.py",               (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("pipelined_attention_load_q", "pipelined_attention_load_q.py",        (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
+    Target("pipelined_attention_qk_and_max", "pipelined_attention_qk_and_max.py",(),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
 ]
 
 

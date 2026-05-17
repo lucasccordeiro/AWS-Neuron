@@ -133,3 +133,99 @@ def flash_fwd_load_q_only(q: Tile3D, k: Tile3D, v: Tile3D) -> Tile3D:
             load_q(grp_i)
 
     return o
+
+
+def flash_fwd_qk_and_max_only(q: Tile3D, k: Tile3D, v: Tile3D) -> Tile3D:
+    """Shape-skeleton plus load_q and qk_and_max phases.
+
+    Adds the second inner helper of the upstream pipeline. Upstream
+    `qk_and_max(grp_i)` runs, for each (si, pi) in
+    `range(num_2048_tiles_cur_section) x range(4)`:
+      mm1_psum_dot[grp_i, si, pi, ip_res, if_res] =
+        nisa.nc_matmul(q_loaded[grp_i, :, :], k_loaded[si*4+pi, :, :])
+      mhlo_mul_2[grp_i, si, ip_res, pi*512+if_res] =
+        nisa.tensor_scalar_reduce(
+          data=mm1_psum_dot[grp_i, si, pi, ip_res, if_res],
+          op0=multiply, operand0=softmax_scale,
+          reduce_op=max,
+          reduce_res=temp_reduce14_sbuf[grp_i, ip_reduce_res, si*4+pi])
+
+    Shape adaptations from upstream (stub-side only, contract identical):
+    `mm1_psum_dot`, `mhlo_mul_2`, and `temp_reduce14_sbuf` are allocated
+    with par_dim hoisted to d0 (matches the Tile5D / Tile4D / Tile3D
+    convention), so the per-(grp_i, si, pi) fancy stores take the
+    par-axis IndexTensor first, then the upstream's scalar leading axes,
+    then the trailing free-axis IndexTensor. `k_loaded` is allocated but
+    not populated — the upstream `load_k` phase is a separate helper and
+    qk_and_max only consumes shape, not values. `softmax_scale` is
+    dropped from the port (the scalar operand does not enter the
+    tensor_scalar_reduce shape contract).
+    """
+    b, d, seqlen_q = q.shape
+    _, _, seqlen_k = k.shape
+
+    assert d <= 128
+    assert seqlen_k % 128 == 0
+    assert seqlen_k % 512 == 0
+    assert v.d0 == b
+    assert v.d1 == seqlen_k
+    assert v.d2 == d
+    assert k.d0 == b
+    assert k.d1 == d
+    assert k.d2 == seqlen_k
+
+    o: Tile3D = nl_ndarray_3d(b, seqlen_q, d, q.dtype, BUF_SHARED_HBM)
+
+    sb_p: int       = 128
+    num_grps: int   = seqlen_k // sb_p
+    section_len: int = 2048
+    num_sections: int = seqlen_q // section_len
+    num_512_tiles: int = seqlen_k // 512
+    batch_id: int = 0
+
+    k_loaded: Tile3D = nl_ndarray_3d(num_512_tiles, 128, 512, k.dtype, BUF_SBUF)
+
+    for _section_i in nl_affine_range(num_sections):
+        p: int = d
+        n: int = sb_p
+        num_2048_tiles_cur_section: int = section_len // 2048
+        q_loaded: Tile3D = nl_ndarray_3d(num_grps, p, n, q.dtype, BUF_SBUF)
+        mm1_psum_dot: Tile5D = nl_ndarray_5d(
+            128, num_grps, num_2048_tiles_cur_section, 4, 512,
+            DT_F32, BUF_PSUM)
+        mhlo_mul_2: Tile4D = nl_ndarray_4d(
+            128, num_grps, num_2048_tiles_cur_section, 2048,
+            DT_F32, BUF_SBUF)
+        temp_reduce14_sbuf: Tile3D = nl_ndarray_3d(
+            128, num_grps, num_2048_tiles_cur_section * 4,
+            DT_F32, BUF_SBUF)
+        iq_p, iq_f = nl_mgrid_2d(0, p, 0, n)
+
+        def load_q(grp_i: int) -> None:
+            shifted: IndexTensor = index_add_scalar(iq_f, grp_i * n)
+            loaded: Tile = nl_load_3d_fancy(q, batch_id, iq_p, shifted)
+            nl_store_3d_fancy(q_loaded, grp_i, iq_p, iq_f, loaded)
+
+        def qk_and_max(grp_i: int) -> None:
+            for si in nl_affine_range(num_2048_tiles_cur_section):
+                for pi in nl_affine_range(4):
+                    loc_512_tile_i: int = si * 4 + pi
+                    ip_res, if_res = nl_mgrid_2d(0, 128, 0, 512)
+                    ip_reduce_res, _ = nl_mgrid_2d(0, 128, 0, 1)
+                    q_slab: Tile = q_loaded[grp_i, :, :]
+                    k_slab: Tile = k_loaded[loc_512_tile_i, :, :]
+                    mm: Tile = ni_nc_matmul(q_slab, k_slab)
+                    nl_store_5d_fancy_par_first(
+                        mm1_psum_dot, ip_res, grp_i, si, pi, if_res, mm)
+                    reduce_slot: Tile = nl_slice_3d_par_first(
+                        temp_reduce14_sbuf, ip_reduce_res, grp_i, si * 4 + pi)
+                    scaled: Tile = nisa_tensor_scalar_reduce(mm, reduce_slot)
+                    shifted_if: IndexTensor = index_add_scalar(if_res, pi * 512)
+                    nl_store_4d_fancy_par_first(
+                        mhlo_mul_2, ip_res, grp_i, si, shifted_if, scaled)
+
+        for grp_i in nl_affine_range(num_grps):
+            load_q(grp_i)
+            qk_and_max(grp_i)
+
+    return o
