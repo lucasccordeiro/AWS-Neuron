@@ -336,15 +336,18 @@ Deferred:
   the basic softmax-chain prerequisite, but pipelining and producer/
   consumer queues are still unmodelled.
 - `contributed/pipelined_attention.py` — Flash Attention with software
-  pipelining. **Four partial ports landed**: `flash_fwd_shell` verifies
+  pipelining. **Five partial ports landed**: `flash_fwd_shell` verifies
   the top-level I/O contract and the outer running-statistic SBUF
   buffer shapes, `flash_fwd_load_q_only` adds `load_q`,
   `flash_fwd_qk_and_max_only` adds `qk_and_max` (per-(grp_i, si, pi)
   `nisa.nc_matmul` into a 5-D PSUM tile and `nisa.tensor_scalar_reduce`
   into a 4-D SBUF tile, with the axis-1 max written into a 3-D temp
-  SBUF), and `flash_fwd_update_max_only` adds `update_max` (axis-1
+  SBUF), `flash_fwd_update_max_only` adds `update_max` (axis-1
   max reduction into `final_reduce_max` plus the section-boundary
-  update of `running_max`, `prev_running_max`, and `scaling_factor`).
+  update of `running_max`, `prev_running_max`, and `scaling_factor`),
+  and `flash_fwd_exp_only` adds `exp` (per-(grp_i, si, pi)
+  `nisa.activation_reduce` of `mhlo_mul_2` with `running_max` bias,
+  writing `exp6_sbuf` and the axis-1 sum into `final_reduce_sum_b`).
   Stub infrastructure introduced: `nl_mgrid_2d` (2-D `nl.mgrid`
   returning two IndexTensors), `nl_load_3d_fancy` and
   `nl_store_3d_fancy` (3-D load/store with scalar + IndexTensor mixed
@@ -356,24 +359,27 @@ Deferred:
   `nl_store_3d_par_first`, `nl_slice_2d_par_first`,
   `nl_store_2d_par_first`) and value-returning ISA variants
   (`ni_tensor_reduce_axis1`, `ni_tensor_tensor`, `ni_tensor_copy`,
-  `ni_activation`). Nested function definitions with cross-module
+  `ni_activation`); for `exp`, the par-axis-first 4-D fancy load
+  `nl_load_4d_fancy_par_first` and value-returning
+  `nisa_activation_reduce` (elementwise activation with bias and
+  axis-1 reduce_res). Nested function definitions with cross-module
   class-instance captures are resolved by ESBMC's Python frontend after
   [esbmc/esbmc#4578](https://github.com/esbmc/esbmc/pull/4578) (fixes
   [#4572](https://github.com/esbmc/esbmc/issues/4572)) added the
-  enclosing-function fallback to closure type inference; all three
+  enclosing-function fallback to closure type inference; all four
   nested helpers close over their captures directly, matching the
-  upstream signatures. The par_dim axis is hoisted to d0 in the
-  qk_and_max / update_max tiles (`mm1_psum_dot`, `mhlo_mul_2`,
-  `temp_reduce14_sbuf`, `final_reduce_max`, `prev_running_max`,
-  `scaling_factor`) to match the Tile5D / Tile4D / Tile3D convention —
-  shape contract identical to the upstream `nl.par_dim(128)`
-  annotation. The four remaining inner helpers (`exp` / `tp` / `pv` /
-  `write_back`) are still unmodelled — extending requires custom
-  `sb_mod(base_addr=, num_free_tiles=)` and `psum.alloc(<callback>)`
-  allocators (currently stripped to plain `BUF_SBUF`/`BUF_PSUM`),
-  `par_dim(n)` shape-tuple wrappers (currently dropped), 6-D
-  allocations, and `nl.program_id` / `nl.shared_constant` /
-  `@nki.baremetal`. The 16K seqlen also produces large nested loop
+  upstream signatures. The par_dim axis is hoisted to d0 in every
+  multi-D tile (`mm1_psum_dot`, `mhlo_mul_2`, `temp_reduce14_sbuf`,
+  `final_reduce_max`, `prev_running_max`, `scaling_factor`,
+  `exp6_sbuf`, `final_reduce_sum_b`) to match the Tile5D / Tile4D /
+  Tile3D convention — shape contract identical to the upstream
+  `nl.par_dim(128)` annotation. The three remaining inner helpers
+  (`tp` / `pv` / `write_back`) are still unmodelled — extending
+  requires custom `sb_mod(base_addr=, num_free_tiles=)` and
+  `psum.alloc(<callback>)` allocators (currently stripped to plain
+  `BUF_SBUF`/`BUF_PSUM`), `par_dim(n)` shape-tuple wrappers (currently
+  dropped), 6-D allocations, and `nl.program_id` /
+  `nl.shared_constant` / `@nki.baremetal`. The 16K seqlen also produces large nested loop
   counts (128, 64, 16, 4); the toy-shape port uses seqlen 2048 to keep
   BMC unwinding feasible while preserving the divisibility chain
   (seqlen_q % section_len == 0, section_len % 2048 == 0,

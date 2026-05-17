@@ -143,10 +143,10 @@ Concrete-shape targets complete in 1–3 seconds wall-clock each on a
 stock laptop. The thirteen symbolic-shape targets run for ~5–90
 seconds depending on the size of the shape family they sweep —
 eleven of the thirteen `--unwind` values are k-induction-certified
-complete (see `REPORT.md` for the table). Phase-1 (55 runs) finishes
-in about 9 minutes; phase-2 (35 runs — every concrete- and
+complete (see `REPORT.md` for the table). Phase-1 (58 runs) finishes
+in about 14 minutes; phase-2 (38 runs — every concrete- and
 symbolic-shape good kernel plus the AUDIT-15 reproducer) finishes in
-about 6 minutes; the combined two-phase sweep is ~15 minutes end-to-end.
+about 11 minutes; the combined two-phase sweep is ~26 minutes end-to-end.
 
 ## Where to read more
 
