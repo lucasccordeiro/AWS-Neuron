@@ -508,3 +508,194 @@ def flash_fwd_exp_only(q: Tile3D, k: Tile3D, v: Tile3D) -> Tile3D:
             exp(grp_i)
 
     return o
+
+
+def flash_fwd_tp_only(q: Tile3D, k: Tile3D, v: Tile3D) -> Tile3D:
+    """Shape-skeleton + load_q + qk_and_max + update_max + exp + tp.
+
+    Adds the fifth inner helper. Upstream `tp(grp_i)`:
+      for si in range(num_2048_tiles_cur_section):
+        for tp_grp in range(num_tp_grps):
+          ip_tp, if_tp = nl.mgrid[0:128, 0:128]
+          ip_cp, if_cp = nl.mgrid[0:128, 0:n_per_part]
+          for ti in range(num_tps_in_grp):
+            tp_psum[grp_i, si, tp_grp, ip_tp, ti*128+if_tp] =
+              nisa.nc_matmul(
+                exp6_sbuf[grp_i, si, ip_tp, tp_grp*n_per_part+ti*128+if_tp],
+                identity_load)
+          tp_sbuf[grp_i, si, tp_grp, ip_cp, if_cp] =
+            nisa.tensor_copy(tp_psum[grp_i, si, tp_grp], dtype=nl.bfloat16)
+
+    Each tp_grp gathers `num_tps_in_grp = 4` 128-wide tiles from
+    exp6_sbuf via `nc_matmul(... , identity_load)` (right-multiplying
+    by identity == transpose), accumulating into tp_psum's
+    (par_dim, n_per_part = 512) slot, then casts the PSUM block to
+    bfloat16 SBUF via tensor_copy.
+
+    Shape adaptations (stub-side only, contract identical): `tp_psum`
+    and `tp_sbuf` are allocated with par_dim hoisted to d0 (Tile5D
+    convention); the fancy stores reorder the upstream's three
+    leading scalar axes accordingly. `identity_load` is allocated
+    but not populated — the upstream's `nl.shared_constant`-backed
+    identity matrix only enters as a shape contract for nc_matmul.
+    """
+    b, d, seqlen_q = q.shape
+    _, _, seqlen_k = k.shape
+
+    assert d <= 128
+    assert seqlen_k % 128 == 0
+    assert seqlen_k % 512 == 0
+    assert v.d0 == b
+    assert v.d1 == seqlen_k
+    assert v.d2 == d
+    assert k.d0 == b
+    assert k.d1 == d
+    assert k.d2 == seqlen_k
+
+    o: Tile3D = nl_ndarray_3d(b, seqlen_q, d, q.dtype, BUF_SHARED_HBM)
+
+    sb_p: int       = 128
+    num_grps: int   = seqlen_k // sb_p
+    section_len: int = 2048
+    num_sections: int = seqlen_q // section_len
+    num_512_tiles: int = seqlen_k // 512
+    batch_id: int = 0
+    exp_inst_elems: int = 2048
+    exp_insts: int = 2048 // exp_inst_elems
+    num_tps: int = exp_inst_elems // 128
+    num_tp_grps: int = num_tps // 4
+    num_tps_in_grp: int = 4
+    n_per_part: int = num_tps_in_grp * 128
+
+    running_max: Tile = nl_ndarray_2d(sb_p, num_grps, DT_F32, BUF_SBUF)
+    zero_bias_tensor: Tile = nl_ndarray_2d(128, 1, DT_F32, BUF_SBUF)
+    identity_load: Tile = nl_ndarray_2d(128, 128, DT_BF16, BUF_SBUF)
+    k_loaded: Tile3D = nl_ndarray_3d(num_512_tiles, 128, 512, k.dtype, BUF_SBUF)
+
+    for section_i in nl_affine_range(num_sections):
+        p: int = d
+        n: int = sb_p
+        num_2048_tiles_cur_section: int = section_len // 2048
+        q_loaded: Tile3D = nl_ndarray_3d(num_grps, p, n, q.dtype, BUF_SBUF)
+        mm1_psum_dot: Tile5D = nl_ndarray_5d(
+            128, num_grps, num_2048_tiles_cur_section, 4, 512,
+            DT_F32, BUF_PSUM)
+        mhlo_mul_2: Tile4D = nl_ndarray_4d(
+            128, num_grps, num_2048_tiles_cur_section, 2048,
+            DT_F32, BUF_SBUF)
+        temp_reduce14_sbuf: Tile3D = nl_ndarray_3d(
+            128, num_grps, num_2048_tiles_cur_section * 4,
+            DT_F32, BUF_SBUF)
+        final_reduce_max: Tile3D = nl_ndarray_3d(
+            128, num_grps, 1, DT_F32, BUF_SBUF)
+        prev_running_max: Tile3D = nl_ndarray_3d(
+            128, num_grps, 1, DT_F32, BUF_SBUF)
+        scaling_factor: Tile3D = nl_ndarray_3d(
+            128, num_grps, 1, DT_F32, BUF_SBUF)
+        exp6_sbuf: Tile4D = nl_ndarray_4d(
+            128, num_grps, num_2048_tiles_cur_section, 2048,
+            DT_BF16, BUF_SBUF)
+        final_reduce_sum_b: Tile3D = nl_ndarray_3d(
+            128, num_grps, section_len // exp_inst_elems,
+            DT_F32, BUF_SBUF)
+        tp_psum: Tile5D = nl_ndarray_5d(
+            128, num_grps, num_2048_tiles_cur_section, num_tp_grps, n_per_part,
+            DT_F32, BUF_PSUM)
+        tp_sbuf: Tile5D = nl_ndarray_5d(
+            128, num_grps, num_2048_tiles_cur_section, num_tp_grps, n_per_part,
+            DT_BF16, BUF_SBUF)
+        iq_p, iq_f = nl_mgrid_2d(0, p, 0, n)
+
+        def load_q(grp_i: int) -> None:
+            shifted: IndexTensor = index_add_scalar(iq_f, grp_i * n)
+            loaded: Tile = nl_load_3d_fancy(q, batch_id, iq_p, shifted)
+            nl_store_3d_fancy(q_loaded, grp_i, iq_p, iq_f, loaded)
+
+        def qk_and_max(grp_i: int) -> None:
+            for si in nl_affine_range(num_2048_tiles_cur_section):
+                for pi in nl_affine_range(4):
+                    loc_512_tile_i: int = si * 4 + pi
+                    ip_res, if_res = nl_mgrid_2d(0, 128, 0, 512)
+                    ip_reduce_res, _ = nl_mgrid_2d(0, 128, 0, 1)
+                    q_slab: Tile = q_loaded[grp_i, :, :]
+                    k_slab: Tile = k_loaded[loc_512_tile_i, :, :]
+                    mm: Tile = ni_nc_matmul(q_slab, k_slab)
+                    nl_store_5d_fancy_par_first(
+                        mm1_psum_dot, ip_res, grp_i, si, pi, if_res, mm)
+                    reduce_slot: Tile = nl_slice_3d_par_first(
+                        temp_reduce14_sbuf, ip_reduce_res, grp_i, si * 4 + pi)
+                    scaled: Tile = nisa_tensor_scalar_reduce(mm, reduce_slot)
+                    shifted_if: IndexTensor = index_add_scalar(if_res, pi * 512)
+                    nl_store_4d_fancy_par_first(
+                        mhlo_mul_2, ip_res, grp_i, si, shifted_if, scaled)
+
+        def update_max(grp_i: int) -> None:
+            ip_reduce, _ = nl_mgrid_2d(0, 128, 0, 1)
+            t14: Tile = nl_slice_3d_drop_d1(temp_reduce14_sbuf, grp_i)
+            fr_max: Tile = ni_tensor_reduce_axis1(t14)
+            nl_store_3d_par_first(final_reduce_max, ip_reduce, grp_i, 0, fr_max)
+            if section_i == 0:
+                fr_max_view: Tile = nl_slice_3d_drop_d1(final_reduce_max, grp_i)
+                nl_store_2d_par_first(
+                    running_max, ip_reduce, grp_i, ni_tensor_copy(fr_max_view))
+            if section_i > 0:
+                rm_slot: Tile = nl_slice_2d_par_first(running_max, ip_reduce, grp_i)
+                neg_rm: Tile = ni_activation(rm_slot, zero_bias_tensor)
+                nl_store_3d_par_first(prev_running_max, ip_reduce, grp_i, 0, neg_rm)
+                fr_max_view: Tile = nl_slice_3d_drop_d1(final_reduce_max, grp_i)
+                new_rm: Tile = ni_tensor_tensor(rm_slot, fr_max_view)
+                nl_store_2d_par_first(running_max, ip_reduce, grp_i, new_rm)
+                prev_view: Tile = nl_slice_3d_drop_d1(prev_running_max, grp_i)
+                rm_slot2: Tile = nl_slice_2d_par_first(running_max, ip_reduce, grp_i)
+                sf: Tile = ni_activation(prev_view, rm_slot2)
+                nl_store_3d_par_first(scaling_factor, ip_reduce, grp_i, 0, sf)
+
+        def exp(grp_i: int) -> None:
+            ip_reduce, _ = nl_mgrid_2d(0, 128, 0, 1)
+            ip_final_reduce_sum, _ = nl_mgrid_2d(0, 128, 0, 1)
+            for si in nl_affine_range(num_2048_tiles_cur_section):
+                access_n: int = exp_inst_elems
+                ip_p, ip_n = nl_mgrid_2d(0, 128, 0, access_n)
+                for pi in nl_affine_range(exp_insts):
+                    src_n: IndexTensor = index_add_scalar(ip_n, access_n * pi)
+                    data: Tile = nl_load_4d_fancy_par_first(
+                        mhlo_mul_2, ip_p, grp_i, si, src_n)
+                    bias: Tile = nl_slice_2d_par_first(
+                        running_max, ip_reduce, grp_i)
+                    reduce_slot: Tile = nl_slice_3d_par_first(
+                        final_reduce_sum_b, ip_final_reduce_sum, grp_i,
+                        si * exp_insts + pi)
+                    exp_out: Tile = nisa_activation_reduce(
+                        data, bias, reduce_slot)
+                    dst_n: IndexTensor = index_add_scalar(ip_n, pi * access_n)
+                    nl_store_4d_fancy_par_first(
+                        exp6_sbuf, ip_p, grp_i, si, dst_n, exp_out)
+
+        def tp(grp_i: int) -> None:
+            for si in nl_affine_range(num_2048_tiles_cur_section):
+                for tp_grp in nl_affine_range(num_tp_grps):
+                    ip_tp, if_tp = nl_mgrid_2d(0, 128, 0, 128)
+                    ip_cp, if_cp = nl_mgrid_2d(0, 128, 0, n_per_part)
+                    for ti in nl_affine_range(num_tps_in_grp):
+                        src_n: IndexTensor = index_add_scalar(
+                            if_tp, tp_grp * n_per_part + ti * 128)
+                        exp_slab: Tile = nl_load_4d_fancy_par_first(
+                            exp6_sbuf, ip_tp, grp_i, si, src_n)
+                        mm: Tile = ni_nc_matmul(exp_slab, identity_load)
+                        dst_n: IndexTensor = index_add_scalar(if_tp, ti * 128)
+                        nl_store_5d_fancy_par_first(
+                            tp_psum, ip_tp, grp_i, si, tp_grp, dst_n, mm)
+                    tp_block: Tile = nl_slice_5d_drop_d1d2d3(
+                        tp_psum, grp_i, si, tp_grp)
+                    cp: Tile = ni_tensor_copy(tp_block)
+                    nl_store_5d_fancy_par_first(
+                        tp_sbuf, ip_cp, grp_i, si, tp_grp, if_cp, cp)
+
+        for grp_i in nl_affine_range(num_grps):
+            load_q(grp_i)
+            qk_and_max(grp_i)
+            update_max(grp_i)
+            exp(grp_i)
+            tp(grp_i)
+
+    return o
