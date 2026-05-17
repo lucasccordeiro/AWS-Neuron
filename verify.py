@@ -151,6 +151,7 @@ MANIFEST: list[Target] = [
     Target("pipelined_attention",        "pipelined_attention.py",               (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("pipelined_attention_load_q", "pipelined_attention_load_q.py",        (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("pipelined_attention_qk_and_max", "pipelined_attention_qk_and_max.py",(),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
+    Target("pipelined_attention_update_max", "pipelined_attention_update_max.py",(),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
 ]
 
 

@@ -1023,3 +1023,110 @@ def nisa_tensor_scalar_reduce(data: Tile, reduce_res: Tile) -> Tile:
     assert reduce_res.d0 == data.d0
     assert reduce_res.d1 == 1
     return Tile(data.d0, data.d1, data.dtype, BUF_SBUF)
+
+# ============================================================== update_max fancy indexing
+# Pipelined-attention `update_max` reads the qk_and_max max-tracker
+# (temp_reduce14_sbuf) and writes per-grp_i running-max / scaling-factor
+# tiles. The port hoists par_dim to d0 (Tile3D / Tile5D convention),
+# so the upstream `t[grp_i]` shorthand becomes a slice that drops d1
+# instead of d0, and 3-D fancy stores take the par-axis IndexTensor
+# first followed by two scalar trailing axes.
+
+# Tile3D plane slice with par-axis-first layout: drop the scalar middle
+# axis at position k, returning a Tile view of (d0, d2). Models the
+# upstream's `temp_reduce14_sbuf[grp_i]`, `final_reduce_max[grp_i]`,
+# and `prev_runnning_max[grp_i]` shorthands (which drop the leading
+# grp_i axis on the upstream's par_dim-second layout).
+def nl_slice_3d_drop_d1(src: Tile3D, k: int) -> Tile:
+    assert 0 <= k
+    assert k < src.d1
+    return Tile(src.d0, src.d2, src.dtype, src.buffer)
+
+# Tile3D fancy store with par-axis-first layout: IndexTensor on d0
+# (par_dim), two scalar trailing axes (d1, d2). Mirror of
+# nl_slice_3d_par_first for the store direction. Used for
+# `final_reduce_max[ip_reduce, grp_i, 0] = value`,
+# `prev_running_max[ip_reduce, grp_i, 0] = value`, and
+# `scaling_factor[ip_reduce, grp_i, 0] = value`.
+def nl_store_3d_par_first(dst: Tile3D,
+                          ax_p: IndexTensor,
+                          k1: int, k2: int,
+                          value: Tile) -> None:
+    p: int = nondet_int()
+    __ESBMC_assume(ax_p.low <= p)
+    __ESBMC_assume(p < ax_p.high)
+    assert 0 <= p
+    assert p < dst.d0
+    assert 0 <= k1
+    assert k1 < dst.d1
+    assert 0 <= k2
+    assert k2 < dst.d2
+    assert value.d0 == (ax_p.high - ax_p.low)
+    assert value.d1 == 1
+
+# 2-D fancy slice with par-axis-first layout: IndexTensor on d0 + scalar
+# on d1. Models the upstream's `running_max[ip_reduce, grp_i]` rvalue
+# (returns a (par_dim, 1) column-vector view).
+def nl_slice_2d_par_first(src: Tile,
+                          ax_p: IndexTensor,
+                          k1: int) -> Tile:
+    p: int = nondet_int()
+    __ESBMC_assume(ax_p.low <= p)
+    __ESBMC_assume(p < ax_p.high)
+    assert 0 <= p
+    assert p < src.d0
+    assert 0 <= k1
+    assert k1 < src.d1
+    return Tile(ax_p.high - ax_p.low, 1, src.dtype, src.buffer)
+
+# 2-D fancy store with par-axis-first layout: IndexTensor on d0 + scalar
+# on d1. Mirror of nl_slice_2d_par_first for the store direction. Used
+# for `running_max[ip_reduce, grp_i] = value`.
+def nl_store_2d_par_first(dst: Tile,
+                          ax_p: IndexTensor,
+                          k1: int,
+                          value: Tile) -> None:
+    p: int = nondet_int()
+    __ESBMC_assume(ax_p.low <= p)
+    __ESBMC_assume(p < ax_p.high)
+    assert 0 <= p
+    assert p < dst.d0
+    assert 0 <= k1
+    assert k1 < dst.d1
+    assert value.d0 == (ax_p.high - ax_p.low)
+    assert value.d1 == 1
+
+# Value-returning forms of ISA primitives used by update_max. The
+# upstream uses `slot = nisa.tensor_X(...)` followed by fancy-store
+# assignment, so each call site needs a Tile-returning variant. Shape
+# contracts mirror the existing destination-passing forms.
+
+# nisa.tensor_reduce(data, op, axis=1) — axis-1 reduce producing the
+# column-vector (data.d0, 1). The `op` (max/sum/min) and `negate` flag
+# do not enter the shape contract.
+def ni_tensor_reduce_axis1(data: Tile) -> Tile:
+    return Tile(data.d0, 1, data.dtype, data.buffer)
+
+# nisa.tensor_tensor(a, b, op) — value-returning shape-equality binary.
+# The `op` does not enter the shape contract; dtypes need not match
+# (mixed-precision accumulation, matching nisa_tensor_tensor).
+def ni_tensor_tensor(a: Tile, b: Tile) -> Tile:
+    assert a.d0 == b.d0
+    assert a.d1 == b.d1
+    return Tile(a.d0, a.d1, a.dtype, a.buffer)
+
+# nisa.tensor_copy(src) — value-returning shape passthrough. Dtype need
+# not match destination (cross-dtype copy permitted, matching
+# nisa_tensor_copy / nisa_dma_copy).
+def ni_tensor_copy(src: Tile) -> Tile:
+    return Tile(src.d0, src.d1, src.dtype, src.buffer)
+
+# nisa.activation(op, data, scale=..., bias=...) — value-returning
+# elementwise unary activation with optional scale and bias. The bias
+# must match data's shape (column-vector bias broadcasts across the
+# free dim). The scalar `scale` and the activation `op` do not enter
+# the shape contract. Shape passthrough on data.
+def ni_activation(data: Tile, bias: Tile) -> Tile:
+    assert bias.d0 == data.d0
+    assert bias.d1 == data.d1 or bias.d1 == 1
+    return Tile(data.d0, data.d1, data.dtype, data.buffer)
