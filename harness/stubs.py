@@ -929,3 +929,97 @@ def nisa_tensor_scalar_3d(dst: Tile3D, data: Tile3D) -> None:
     assert dst.d0 == data.d0
     assert dst.d1 == data.d1
     assert dst.d2 == data.d2
+
+# ============================================================== qk_and_max fancy indexing
+# Pipelined-attention `qk_and_max` writes a per-(grp_i, si, pi) (par_dim,
+# free) matmul tile into a 5-D PSUM tensor (mm1_psum_dot) and a per-
+# (grp_i, si) (par_dim, free) softmax-scaled tile into a 4-D SBUF tensor
+# (mhlo_mul_2). The upstream layouts label par_dim on a non-leading axis
+# (axis 3 of mm1_psum_dot, axis 2 of mhlo_mul_2, axis 1 of
+# temp_reduce14_sbuf); the port hoists par_dim to d0 in each tile (a
+# stub-side adaptation only — the shape contract is identical), so the
+# fancy stores below take the par-axis IndexTensor first, then the
+# scalar middle axes, then the trailing free-axis IndexTensor.
+
+# Tile5D fancy store with par-axis-first layout: IndexTensor on d0
+# (par_dim), three scalar middle axes (d1, d2, d3), IndexTensor on d4
+# (free axis). Used for `mm1_psum_dot[ip_res, grp_i, si, pi, if_res] =
+# nc_matmul_result`.
+def nl_store_5d_fancy_par_first(dst: Tile5D,
+                                 ax_p: IndexTensor,
+                                 k1: int, k2: int, k3: int,
+                                 ax_f: IndexTensor,
+                                 value: Tile) -> None:
+    p: int = nondet_int()
+    f: int = nondet_int()
+    __ESBMC_assume(ax_p.low <= p)
+    __ESBMC_assume(p < ax_p.high)
+    __ESBMC_assume(ax_f.low <= f)
+    __ESBMC_assume(f < ax_f.high)
+    assert 0 <= p
+    assert p < dst.d0
+    assert 0 <= k1
+    assert k1 < dst.d1
+    assert 0 <= k2
+    assert k2 < dst.d2
+    assert 0 <= k3
+    assert k3 < dst.d3
+    assert 0 <= f
+    assert f < dst.d4
+    assert value.d0 == (ax_p.high - ax_p.low)
+    assert value.d1 == (ax_f.high - ax_f.low)
+
+# Tile4D fancy store with par-axis-first layout: IndexTensor on d0
+# (par_dim), two scalar middle axes (d1, d2), IndexTensor on d3 (free
+# axis). Used for `mhlo_mul_2[ip_res, grp_i, si, pi*512 + if_res] =
+# tensor_scalar_reduce_result`.
+def nl_store_4d_fancy_par_first(dst: Tile4D,
+                                 ax_p: IndexTensor,
+                                 k1: int, k2: int,
+                                 ax_f: IndexTensor,
+                                 value: Tile) -> None:
+    p: int = nondet_int()
+    f: int = nondet_int()
+    __ESBMC_assume(ax_p.low <= p)
+    __ESBMC_assume(p < ax_p.high)
+    __ESBMC_assume(ax_f.low <= f)
+    __ESBMC_assume(f < ax_f.high)
+    assert 0 <= p
+    assert p < dst.d0
+    assert 0 <= k1
+    assert k1 < dst.d1
+    assert 0 <= k2
+    assert k2 < dst.d2
+    assert 0 <= f
+    assert f < dst.d3
+    assert value.d0 == (ax_p.high - ax_p.low)
+    assert value.d1 == (ax_f.high - ax_f.low)
+
+# Tile3D slice with par-axis-first layout: IndexTensor on d0 (par_dim),
+# two scalar trailing axes (d1, d2). Returns the 1-wide column at
+# (*, k1, k2). Used to materialise the `reduce_res` slot
+# `temp_reduce14_sbuf[ip_reduce_res, grp_i, si*4+pi]` consumed by
+# nisa.tensor_scalar_reduce.
+def nl_slice_3d_par_first(src: Tile3D,
+                          ax_p: IndexTensor,
+                          k1: int, k2: int) -> Tile:
+    p: int = nondet_int()
+    __ESBMC_assume(ax_p.low <= p)
+    __ESBMC_assume(p < ax_p.high)
+    assert 0 <= p
+    assert p < src.d0
+    assert 0 <= k1
+    assert k1 < src.d1
+    assert 0 <= k2
+    assert k2 < src.d2
+    return Tile(ax_p.high - ax_p.low, 1, src.dtype, src.buffer)
+
+# nisa.tensor_scalar_reduce(data, op0=multiply, operand0=scalar,
+#   reduce_op=max, reduce_res=column_slot) — applies a scalar elementwise
+# op to `data`, returns the result tile, and writes the axis-1 reduction
+# into `reduce_res`. The scalar operand does not enter the shape
+# contract; `reduce_res` must be the (data.d0, 1) column-vector view.
+def nisa_tensor_scalar_reduce(data: Tile, reduce_res: Tile) -> Tile:
+    assert reduce_res.d0 == data.d0
+    assert reduce_res.d1 == 1
+    return Tile(data.d0, data.d1, data.dtype, BUF_SBUF)
