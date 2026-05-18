@@ -536,3 +536,61 @@ Shape-and-bounds verification is a partial completeness story.
 contract is violated; they fail at the semantic-correctness level. Our
 verifier explicitly does not promise to catch them — but documenting
 the boundary in AUDIT keeps the soundness/completeness claim honest.
+
+## Finding 16 — upstream input-validation gap in `tensor_avgpool_kernel`
+
+Same class as Finding 15: the upstream
+`tutorials/average_pool2d/tensor_avgpool_kernel(in_tensor, pool_size)`
+has an untyped `pool_size` parameter, no default, and no body-level
+assertion rejecting `pool_size <= 0`. The body computes:
+
+```python
+sz_hout = sz_hin // pool_size      # ZeroDivisionError at JIT trace time when pool_size == 0
+sz_wout = sz_win // pool_size      # same — both sites firing in one kernel
+nisa.tensor_scalar(..., 1.0 / (pool_size * pool_size), ...)  # also unsafe at 0
+```
+
+Reachability splits the same way as Finding 15 (interpolate): not
+reachable from any in-tree caller of nki-samples@a87aaa44 (the
+benchmark and correctness functions pass a fixed concrete
+`pool_size`), but reachable from the public API contract.
+
+### Phase-2 audit target: `avgpool_hostarith_unguarded`
+
+A standalone reproducer that mirrors only the two upstream floor-divs,
+under the weakest admissible `__ESBMC_assume`:
+
+```python
+__ESBMC_assume(pool_size >= 0)            # upstream signature is untyped int
+__ESBMC_assume(pool_size <= sz_hin)        # implied by `sz_hin // pool_size > 0` usage
+__ESBMC_assume(pool_size <= sz_win)
+sz_hout = sz_hin // pool_size
+sz_wout = sz_win // pool_size
+```
+
+Run with `_SAFETY_AUDIT` (`--overflow-check --multi-property`). ESBMC
+reports **both** floor-div sites as `VERIFICATION FAILED — division
+by zero` in a single run — this is the use case `--multi-property`
+was wired in for. Without `--multi-property`, ESBMC would stop at the
+first floor-div and the second would be invisible to the regression.
+Witness: `pool_size = 0` reaches both sites.
+
+### Filed upstream?
+
+To be reported alongside the interpolate finding. The upstream
+`tensor_avgpool_kernel` would benefit from one of:
+- explicit `assert pool_size >= 1`
+- type annotation `pool_size: int` with a documented `>= 1`
+  precondition
+
+### Lesson
+
+The agent guidance in `esbmc-verifier.md` step 6.5 (Python NKI:
+host-side arithmetic and the port-time-guard pitfall) prescribes
+extracting at-risk divisors into `_hostarith_unguarded` reproducers
+*before* adding port-time guards. The avgpool case validates the
+guidance: a sweep of the existing kernel ports for `// param`
+expressions surfaced this one without any additional intuition.
+The two-site enumeration that `--multi-property` reports is itself a
+soundness signal — it confirms the bug is structural (both output
+dimensions share the divisor), not a localised one.

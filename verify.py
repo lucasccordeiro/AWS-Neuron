@@ -123,6 +123,7 @@ MANIFEST: list[Target] = [
     # check on the integer floor-div, without relying on our port-time
     # `assert step_size > 0` precondition.
     Target("audit15_hostarith_unguarded","audit15_hostarith_unguarded.py",(),                None,         _SAFETY_AUDIT, "FAILED"),
+    Target("avgpool_hostarith_unguarded","avgpool_hostarith_unguarded.py",(),                None,         _SAFETY_AUDIT, "FAILED"),
     Target("matmul_basic",               "matmul_basic.py",               (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("matmul_basic_buggy",         "matmul_basic_buggy.py",         (),                "FAILED"),
     Target("mamba_v1",                   "mamba_v1.py",                   (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
