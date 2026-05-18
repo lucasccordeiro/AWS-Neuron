@@ -336,9 +336,13 @@ Deferred:
   the basic softmax-chain prerequisite, but pipelining and producer/
   consumer queues are still unmodelled.
 - `contributed/pipelined_attention.py` — Flash Attention with software
-  pipelining. **Seven partial ports landed**: `flash_fwd_shell` verifies
+  pipelining. **Full inner pipeline modelled** — `flash_fwd_shell` verifies
   the top-level I/O contract and the outer running-statistic SBUF
-  buffer shapes, `flash_fwd_load_q_only` adds `load_q`,
+  buffer shapes, six per-helper partial ports incrementally extend the
+  skeleton, and `flash_fwd_full` composes all seven inner helpers
+  (`load_q` / `qk_and_max` / `update_max` / `exp` / `tp` / `pv` /
+  `write_back`) end-to-end. Per-helper detail: `flash_fwd_load_q_only`
+  adds `load_q`,
   `flash_fwd_qk_and_max_only` adds `qk_and_max` (per-(grp_i, si, pi)
   `nisa.nc_matmul` into a 5-D PSUM tile and `nisa.tensor_scalar_reduce`
   into a 4-D SBUF tile, with the axis-1 max written into a 3-D temp
@@ -375,27 +379,37 @@ Deferred:
   `ni_nc_matmul` and `ni_tensor_copy` value-returning ISA forms; for
   `pv`, the par-axis-first 5-D fancy load `nl_load_5d_fancy_par_first`,
   the Tile4D middle-axes plane slice `nl_slice_4d_drop_d1d2`, and the
-  Tile3D middle-axis plane store `nl_store_3d_drop_d1`.
-  Nested function definitions with cross-module class-instance
-  captures are resolved by ESBMC's Python frontend after
+  Tile3D middle-axis plane store `nl_store_3d_drop_d1`; and for
+  `write_back`, three value-returning ISA forms —
+  `ni_tensor_scalar_mul_add` (multi-op `data * operand0 + operand1` with
+  column-vector broadcast on the operands), `ni_reciprocal`, and
+  `ni_activation_scale_bias` (activation with both column-vector
+  scale and bias). Nested function definitions with cross-module
+  class-instance captures are resolved by ESBMC's Python frontend after
   [esbmc/esbmc#4578](https://github.com/esbmc/esbmc/pull/4578) (fixes
   [#4572](https://github.com/esbmc/esbmc/issues/4572)) added the
-  enclosing-function fallback to closure type inference; all six
+  enclosing-function fallback to closure type inference; all seven
   nested helpers close over their captures directly, matching the
   upstream signatures. The par_dim axis is hoisted to d0 in every
   multi-D tile (`mm1_psum_dot`, `mhlo_mul_2`, `temp_reduce14_sbuf`,
   `final_reduce_max`, `prev_running_max`, `scaling_factor`,
   `exp6_sbuf`, `final_reduce_sum_b`, `tp_psum`, `tp_sbuf`, `mm2_psum`,
-  `mm2_sbuf`) to match the Tile5D / Tile4D / Tile3D convention —
-  shape contract identical to the upstream `nl.par_dim(128)`
-  annotation. `v_loaded` keeps the upstream par_dim-on-d1 layout so
-  the existing `nl_load_3d_fancy` reader applies unchanged. The one
-  remaining inner helper (`write_back`) is still unmodelled —
-  extending requires custom `sb_mod(base_addr=, num_free_tiles=)` and
-  `psum.alloc(<callback>)` allocators (currently stripped to plain
-  `BUF_SBUF`/`BUF_PSUM`), `par_dim(n)` shape-tuple wrappers (currently
-  dropped), 6-D allocations, and `nl.program_id` /
-  `nl.shared_constant` / `@nki.baremetal`. The 16K seqlen also produces large nested loop
+  `mm2_sbuf`, `final_reduce_sum_b_collect`, `prev_running_sum`,
+  `prev_output`, `mm2_sbuf_res`, `mm2_div_sbuf`) to match the Tile5D /
+  Tile4D / Tile3D convention — shape contract identical to the
+  upstream `nl.par_dim(128)` annotation. `v_loaded` keeps the
+  upstream par_dim-on-d1 layout so the existing `nl_load_3d_fancy`
+  reader applies unchanged. **Full inner pipeline now modelled** — no
+  inner helpers remain unported; what the port still stubs (not
+  blockers for shape-and-bounds verification): custom
+  `sb_mod(base_addr=, num_free_tiles=)` and `psum.alloc(<callback>)`
+  allocators (currently stripped to plain `BUF_SBUF`/`BUF_PSUM`),
+  `par_dim(n)` shape-tuple wrappers (par_dim hoisted to d0 instead),
+  6-D allocations, `nl.program_id` / `nl.shared_constant` /
+  `@nki.baremetal`, and upstream's software pipelining with
+  `precise_schedule=True` execution order (the port executes the
+  helpers in straight `for grp_i` order — equivalent for shape
+  verification). The 16K seqlen also produces large nested loop
   counts (128, 64, 16, 4); the toy-shape port uses seqlen 2048 to keep
   BMC unwinding feasible while preserving the divisibility chain
   (seqlen_q % section_len == 0, section_len % 2048 == 0,

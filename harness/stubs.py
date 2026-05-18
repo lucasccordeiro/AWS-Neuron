@@ -1239,3 +1239,35 @@ def nl_store_3d_drop_d1(dst: Tile3D, k: int, value: Tile) -> None:
     assert k < dst.d1
     assert value.d0 == dst.d0
     assert value.d1 == dst.d2
+
+# ============================================================== write_back ISA forms
+
+# nisa.tensor_scalar(data, op0=multiply, operand0=col, op1=add, operand1=col_or_tile)
+# and nisa.scalar_tensor_tensor(data, op0=multiply, operand0=col, op1=add,
+# operand1=tile) — value-returning multi-op `data * operand0 + operand1` with
+# column-vector broadcast on operand0 (and on operand1 when it is (d0, 1)).
+# Returns a Tile with `data`'s shape. The ops themselves do not enter the
+# shape contract.
+def ni_tensor_scalar_mul_add(data: Tile, operand0: Tile, operand1: Tile) -> Tile:
+    assert operand0.d0 == data.d0
+    assert operand0.d1 == data.d1 or operand0.d1 == 1
+    assert operand1.d0 == data.d0
+    assert operand1.d1 == data.d1 or operand1.d1 == 1
+    return Tile(data.d0, data.d1, data.dtype, data.buffer)
+
+# nisa.reciprocal(src) — value-returning shape passthrough mirror of
+# nisa_reciprocal_2d. Dtype taken from src.
+def ni_reciprocal(src: Tile) -> Tile:
+    return Tile(src.d0, src.d1, src.dtype, src.buffer)
+
+# nisa.activation(op, data, scale=col_vec, bias=col_vec) — value-returning
+# activation with both a column-vector scale and a column-vector bias.
+# Extends ni_activation (bias-only). Both `scale` and `bias` broadcast across
+# the free dim when (d0, 1); they may also be the full (d0, d1) shape.
+# Returns a Tile with `data`'s shape.
+def ni_activation_scale_bias(data: Tile, scale: Tile, bias: Tile) -> Tile:
+    assert scale.d0 == data.d0
+    assert scale.d1 == data.d1 or scale.d1 == 1
+    assert bias.d0 == data.d0
+    assert bias.d1 == data.d1 or bias.d1 == 1
+    return Tile(data.d0, data.d1, data.dtype, data.buffer)
