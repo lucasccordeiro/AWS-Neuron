@@ -155,6 +155,7 @@ MANIFEST: list[Target] = [
     Target("pipelined_attention_exp",        "pipelined_attention_exp.py",        (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("pipelined_attention_tp",         "pipelined_attention_tp.py",         (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("pipelined_attention_pv",         "pipelined_attention_pv.py",         (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
+    Target("pipelined_attention_full",       "pipelined_attention_full.py",       (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
 ]
 
 
