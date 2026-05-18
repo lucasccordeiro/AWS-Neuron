@@ -504,7 +504,8 @@ regression.
 
 ### Phase-2 rediscovery (independent witness)
 
-The phase-2 safety-property run (`--overflow-check`, default div-by-
+The phase-2 safety-property run (`--overflow-check --multi-property`
+on this target via `_SAFETY_AUDIT`; default div-by-
 zero) rediscovers F-02 / F-03 *without* relying on the port-time
 `assert step_size > 0`. The standalone target
 `audit15_hostarith_unguarded` reproduces only the upstream host-side

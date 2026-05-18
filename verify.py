@@ -13,7 +13,11 @@ Two phases:
     index arithmetic.  Concrete-shape good kernels opt into phase-2 via
     `safety_args` / `safety_expected`; the AUDIT-15 host-arithmetic
     reproducer is phase-2-only and rediscovers the upstream
-    ZeroDivisionError without the port-time precondition.
+    ZeroDivisionError without the port-time precondition.  Audit-style
+    targets opt into `_SAFETY_AUDIT` instead, which adds
+    `--multi-property` so ESBMC enumerates every violated property in
+    one run — useful when a host-arithmetic reproducer exercises
+    multiple at-risk divisors.
 
 Usage:
   python3 verify.py              # run both phases for every target
@@ -63,14 +67,27 @@ class Target:
 
 
 # Phase-2 flags: `--overflow-check` enables signed integer over/underflow
-# checks; integer division-by-zero is on by default in ESBMC.  Concrete-
-# shape and symbolic-shape good kernels opt in (the symbolic shapes'
-# existing `__ESBMC_assume` bounds are tight enough that signed-int
-# overflow is unreachable across the nondet shape space — no extra
-# preconditions needed); buggy variants stay phase-1 only (the shape
-# bug already fails phase-1, phase-2 adds no signal); historical-bug
-# stays phase-1 only (same reason).
+# checks; integer division-by-zero is on by default in ESBMC.
+# Concrete-shape and symbolic-shape good kernels opt in (the symbolic
+# shapes' existing `__ESBMC_assume` bounds are tight enough that
+# signed-int overflow is unreachable across the nondet shape space — no
+# extra preconditions needed); buggy variants stay phase-1 only (the
+# shape bug already fails phase-1, phase-2 adds no signal);
+# historical-bug stays phase-1 only (same reason).
 _SAFETY: tuple[str, ...] = ("--overflow-check",)
+
+# Phase-2 audit flags: `_SAFETY_AUDIT` adds `--multi-property` so ESBMC
+# enumerates every violated property in one run instead of stopping at
+# the first counterexample. Reserved for audit-style targets that
+# exercise multiple host-arithmetic sites in a single program (the
+# host-side trip-count class, e.g. audit15_hostarith_unguarded and any
+# future `_hostarith_unguarded` extensions). Not applied to standard
+# phase-2 targets: --multi-property roughly doubles or quintuples ESBMC
+# runtime on symbolic-shape verification (measured ~5 min on
+# matmul_block_free_symbolic vs <1 min without it) without changing the
+# verdict, since those targets have no multi-violation surface to
+# enumerate.
+_SAFETY_AUDIT: tuple[str, ...] = ("--overflow-check", "--multi-property")
 
 # Symbolic-shape `--unwind N` values below are k-induction-certified
 # completeness bounds.  An offline `esbmc --k-induction` run on each
@@ -105,7 +122,7 @@ MANIFEST: list[Target] = [
     # upstream ZeroDivisionError on chunk_size=1 via ESBMC's div-by-zero
     # check on the integer floor-div, without relying on our port-time
     # `assert step_size > 0` precondition.
-    Target("audit15_hostarith_unguarded","audit15_hostarith_unguarded.py",(),                None,         _SAFETY, "FAILED"),
+    Target("audit15_hostarith_unguarded","audit15_hostarith_unguarded.py",(),                None,         _SAFETY_AUDIT, "FAILED"),
     Target("matmul_basic",               "matmul_basic.py",               (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("matmul_basic_buggy",         "matmul_basic_buggy.py",         (),                "FAILED"),
     Target("mamba_v1",                   "mamba_v1.py",                   (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
