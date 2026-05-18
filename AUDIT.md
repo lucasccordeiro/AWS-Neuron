@@ -537,9 +537,14 @@ contract is violated; they fail at the semantic-correctness level. Our
 verifier explicitly does not promise to catch them — but documenting
 the boundary in AUDIT keeps the soundness/completeness claim honest.
 
-## Finding 16 — upstream input-validation gap in `tensor_avgpool_kernel`
+## Finding 16 — upstream input-validation gap in `tensor_avgpool_kernel` (low severity)
 
-Same class as Finding 15: the upstream
+**Severity caveat up front.** This is the same *class* of issue as
+Finding 15 (host-side arithmetic with an admissible-but-unhandled
+input) but a noticeably weaker finding in practice. Read this section
+before reporting it upstream — the framing matters.
+
+The upstream
 `tutorials/average_pool2d/tensor_avgpool_kernel(in_tensor, pool_size)`
 has an untyped `pool_size` parameter, no default, and no body-level
 assertion rejecting `pool_size <= 0`. The body computes:
@@ -550,10 +555,26 @@ sz_wout = sz_win // pool_size      # same — both sites firing in one kernel
 nisa.tensor_scalar(..., 1.0 / (pool_size * pool_size), ...)  # also unsafe at 0
 ```
 
-Reachability splits the same way as Finding 15 (interpolate): not
-reachable from any in-tree caller of nki-samples@a87aaa44 (the
-benchmark and correctness functions pass a fixed concrete
-`pool_size`), but reachable from the public API contract.
+Reachability splits the same way as Finding 15: not reachable from
+any in-tree caller of nki-samples@a87aaa44 (the benchmark and
+correctness functions pass a fixed concrete `pool_size`), but
+reachable from the public API contract.
+
+### How this differs from Finding 15
+
+| | Finding 15 (interpolate) | Finding 16 (avgpool) |
+|---|---|---|
+| Trigger value | `chunk_size = 1` | `pool_size = 0` |
+| Semantics of trigger | *Degenerate-but-meaningful* tiling parameter — "process one row at a time, no overlap." A user might plausibly try it | A pooling window of zero elements is *mathematically meaningless*; no reason any user would pass this intentionally |
+| Bug shape | **Derivation mistake**: author wrote `step_size = chunk_size - 1` without considering that `chunk_size = 1` collapses the divisor to 0. Non-obvious arithmetic trap inside the body | **Missing precondition**: API admits 0 but body can't handle 0. The trigger value is unambiguously invalid; the kernel just doesn't say so |
+| Likelihood of a real user tripping it | Realistic — `chunk_size = 1` is the simplest tiling choice you would try | Effectively zero — `pool_size = 0` reads like a typo |
+| Severity | Medium (silent crash on a plausible input) | Low (missing defensive check) |
+
+Finding 15 is a **bug a careful user could hit**. Finding 16 is a
+**defensive-programming gap** — the kernel should fail clean
+(`assert pool_size >= 1`) instead of raising an opaque
+`ZeroDivisionError`, but no plausible workflow would trip it without
+a clear upstream bug elsewhere first.
 
 ### Phase-2 audit target: `avgpool_hostarith_unguarded`
 
@@ -577,20 +598,31 @@ Witness: `pool_size = 0` reaches both sites.
 
 ### Filed upstream?
 
-To be reported alongside the interpolate finding. The upstream
+To be reported as a **defensive-programming follow-up to
+[#125](https://github.com/aws-neuron/nki-samples/issues/125)**, not as
+a security-relevant finding in its own right. The upstream
 `tensor_avgpool_kernel` would benefit from one of:
 - explicit `assert pool_size >= 1`
 - type annotation `pool_size: int` with a documented `>= 1`
   precondition
 
-### Lesson
+### What this PoC target actually proves
 
-The agent guidance in `esbmc-verifier.md` step 6.5 (Python NKI:
-host-side arithmetic and the port-time-guard pitfall) prescribes
-extracting at-risk divisors into `_hostarith_unguarded` reproducers
-*before* adding port-time guards. The avgpool case validates the
-guidance: a sweep of the existing kernel ports for `// param`
-expressions surfaced this one without any additional intuition.
-The two-site enumeration that `--multi-property` reports is itself a
-soundness signal — it confirms the bug is structural (both output
-dimensions share the divisor), not a localised one.
+Three things, in decreasing order of how much they matter:
+
+1. **Workflow soundness.** The agent guidance in `esbmc-verifier.md`
+   step 6.5 (Python NKI: host-side arithmetic and the
+   port-time-guard pitfall) prescribes extracting every at-risk
+   divisor into `_hostarith_unguarded` reproducers *before* adding
+   port-time guards. The avgpool case validates the workflow: a
+   mechanical sweep of `// param` expressions across the kernel ports
+   surfaces every site, including this one. That's the property
+   worth defending.
+2. **`--multi-property` end-to-end.** PR #20 introduced
+   `_SAFETY_AUDIT` for future-proofing; PR #21 is its first real
+   exercise. ESBMC enumerates both `sz_hout` and `sz_wout` floor-divs
+   in one run. Without `--multi-property` only the first would
+   surface and the second would be silently uncovered.
+3. **One more low-severity gap upstream.** The kernel's input
+   validation could be tighter. Not a security finding; a defensive-
+   programming follow-up.
