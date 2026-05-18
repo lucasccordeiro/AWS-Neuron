@@ -67,16 +67,20 @@ passthrough on shape (softmax operates on shape, not value), so
 verification depth doesn't grow proportionally to effort — but the
 *coverage* claim is significant.
 
-**Toy-shape blind spot (v1).** The upstream v1 kernel uses uniformly
-128×128 inputs, which makes the contract suite blind to
-transpose-flag and operand-swap mutations: every input is square,
-every contraction axis is 128, so `k_x == k_y` and the matmul
-hardware-shape limits all hold regardless. A useful follow-up would
-be a second positive control with asymmetric shapes (e.g. fabricated
-(128, 64) Q against (128, 32) K) that would discriminate the
-remaining transpose / operand-order mutations. Recorded for v2+ — v2
-and v3 use larger fully-blocked layouts which already break the
-symmetry naturally.
+**Toy-shape blind spot (v1) — closed.** The upstream v1 kernel uses
+uniformly 128×128 inputs, which originally made the contract suite
+blind to transpose-flag and operand-swap mutations: every input is
+square, every contraction axis is 128, so `k_x == k_y` and the matmul
+hardware-shape limits all hold regardless. **Closed by `attn_fwd_v1_asym`
+(SUCCESSFUL) + `attn_fwd_v1_asym_buggy` (FAILED)**: the good asym
+target drives d_head=128, seqlen_q=64, seqlen_k=seqlen_v=32 through a
+relaxed-precondition port of the v1 kernel; the buggy asym flips the
+first matmul's `(transpose_x, transpose_y)` from `(True, False)` to
+`(False, True)` — invisible at 128×128 (k_x == k_y == 128 either way)
+but caught at the asym shape because the contraction axis no longer
+matches. v2 and v3 use larger fully-blocked layouts which already
+break the symmetry naturally; the v1 closure is the last
+discrimination gap of this kind.
 
 ## Tier 4 — likely lower payoff
 
@@ -122,3 +126,4 @@ Skip unless dtype modelling becomes a goal.
 | + pipelined_attention `tp` partial port | 54 | **DONE** |
 | + pipelined_attention `pv` partial port | 55 | **DONE** |
 | + pipelined_attention `write_back` + `flash_fwd_full` (full inner pipeline) | 56 | **DONE** |
+| + `attn_fwd_v1_asym` good + buggy (closes v1 toy-shape blind spot) | 58 | **DONE** |
