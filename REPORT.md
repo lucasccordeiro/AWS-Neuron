@@ -417,15 +417,23 @@ Deferred:
 - `tutorials/mxfp-matmul` — Microscaled-FP quantization; dtype-heavy
   and shape-light, so verification depth is low for this PoC's model.
 
-**Toy-shape blind spot (v1).** The upstream `attn_fwd_v1` uses
-uniformly 128×128 inputs. Several plausible mutations — transpose-flag
-flip, operand swap — are masked by the shape symmetry: every
-contraction axis is 128, so `k_x == k_y` and the hardware-shape limits
-all hold regardless of which axis carries the contraction. The chosen
-positive control catches a shape-allocation off-by-one cleanly, but a
-second control with asymmetric input shapes would harden the discrimination.
+**Toy-shape blind spot (v1) — closed.** The upstream `attn_fwd_v1`
+uses uniformly 128×128 inputs, which originally masked transpose-flag
+and operand-swap mutations: every contraction axis is 128, so
+`k_x == k_y` and the hardware-shape limits all hold regardless of
+which axis carries the contraction. The original positive control
+catches a shape-allocation off-by-one cleanly, but missed those
+mutation classes. Closed by `attn_fwd_v1_asym` (SUCCESSFUL) and
+`attn_fwd_v1_asym_buggy` (FAILED): a relaxed-precondition port of v1
+driven with d_head=128, seqlen_q=64, seqlen_k=seqlen_v=32 — three
+pairwise-distinct dimensions. The buggy variant flips the first
+matmul's `(transpose_x, transpose_y)` from `(True, False)` to
+`(False, True)`; the flip is invisible at 128×128 (k_x == k_y == 128
+either way) but at the asym shape it changes the contraction axis to
+a non-matching length, and `nl_matmul`'s `assert k_x == k_y` fires.
 v2 and v3 of the upstream tutorial use larger blocked layouts that
-break the symmetry naturally.
+break the symmetry naturally; the v1 closure is the last
+discrimination gap of this kind.
 
 ## What still does not work
 

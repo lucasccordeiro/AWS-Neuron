@@ -143,6 +143,8 @@ MANIFEST: list[Target] = [
     Target("avgpool_symbolic",           "avgpool_symbolic.py",                  ("--unwind", "1"), "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("attn_fwd_v1",                "attn_fwd_v1.py",                       (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("attn_fwd_v1_buggy",          "attn_fwd_v1_buggy.py",                 (),                "FAILED"),
+    Target("attn_fwd_v1_asym",           "attn_fwd_v1_asym.py",                  (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
+    Target("attn_fwd_v1_asym_buggy",     "attn_fwd_v1_asym_buggy.py",            (),                "FAILED"),
     Target("attn_fwd_v2",                "attn_fwd_v2.py",                       (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("attn_fwd_v2_buggy",          "attn_fwd_v2_buggy.py",                 (),                "FAILED"),
     Target("attn_fwd_v3",                "attn_fwd_v3.py",                       ("--unwind", "5"), "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
