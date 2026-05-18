@@ -14,9 +14,16 @@ The verifier runs in two phases:
   via stub asserts. Contract violations surface as precise counterexamples.
 - **Phase 2 (`--overflow-check`, default div-by-zero)** — safety
   properties on host-side index arithmetic. Signed-integer overflow and
-  integer division-by-zero, mapped to CWE-190 / CWE-369. Rediscovers the
-  upstream AUDIT-15 `ZeroDivisionError` on `chunk_size = 1` *without*
-  relying on the port-time precondition that currently guards it.
+  integer division-by-zero, mapped to CWE-190 / CWE-369. Rediscovers
+  the upstream AUDIT-15 `ZeroDivisionError` on `chunk_size = 1`
+  *without* relying on the port-time precondition that currently
+  guards it. Audit-style targets (today: `audit15_hostarith_unguarded`)
+  additionally pass `--multi-property` so ESBMC enumerates every
+  violated property in one run rather than stopping at the first —
+  useful when a host-arithmetic reproducer exercises multiple at-risk
+  divisors. Standard phase-2 stays on plain `--overflow-check` because
+  `--multi-property` measurably slows symbolic-shape verification
+  (~5 min vs <1 min per symbolic target) without changing the verdict.
 
 ## What this looks like in practice
 
