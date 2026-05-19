@@ -36,10 +36,19 @@ assumes familiarity with the verifier but not with NKI.
   retirement initially needed. The kernels are now byte-for-byte
   faithful to the upstream NKI source for indexing. See the *Upstream
   issues filed* table below for the full ledger.
-- **1 real upstream bug caught retroactively** —
+- **Two real upstream bugs caught — one retroactive, one prospective.**
+  Retroactive:
   [aws-neuron/nki-samples#74](https://github.com/aws-neuron/nki-samples/pull/74)
   (pre-fix `nki_matmul_hoist_load_` allocated lhsT slab with the wrong
   free-dim); reproduced as the `matmul_hoist_load_historical` target.
+  Prospective:
+  [aws-neuron/nki-samples#125](https://github.com/aws-neuron/nki-samples/issues/125)
+  (host-side trip-count expression in
+  `interpolate_{bi,tri}linear_2x_fwd` divides by zero at JIT trace time
+  when `chunk_size == 1`); reported by this PoC and closed by upstream
+  [PR #126](https://github.com/aws-neuron/nki-samples/pull/126), which
+  adopted the proposed `chunk_size >= 2` / `dim >= chunk_size`
+  preconditions verbatim.
 - **4 stub-correctness incidents (AUDIT.md Findings 8, 9, 10, 12)** caught by
   the verifier on the first run of a freshly ported kernel — all would
   have shipped silently in the original per-file duplicated-stubs layout.
@@ -54,7 +63,21 @@ assumes familiarity with the verifier but not with NKI.
   (regression-pinned via the new `*_chunk1` targets). The second is a
   discrimination boundary: shape-and-bounds verification doesn't
   detect "kernel did nothing" — documented honestly as a soundness
-  vs completeness limit. To be reported upstream.
+  vs completeness limit. Reported as
+  [aws-neuron/nki-samples#125](https://github.com/aws-neuron/nki-samples/issues/125)
+  and closed by upstream
+  [PR #126](https://github.com/aws-neuron/nki-samples/pull/126);
+  upstream adopted both proposed preconditions, so the standalone
+  `audit15_hostarith_unguarded` phase-2 target and the two `*_chunk1`
+  phase-1 targets are now regressions on the upstream fix.
+- **AUDIT.md Finding 16**: a second, lower-severity host-arithmetic
+  gap in `tutorials/average_pool2d/tensor_avgpool_kernel` —
+  `pool_size = 0` divides by zero at both `sz_hout` and `sz_wout`
+  floor-divs. Surfaced by the same mechanical `// param` sweep that
+  produced Finding 15. First end-to-end exercise of `_SAFETY_AUDIT`
+  (`--overflow-check --multi-property`): ESBMC enumerates both
+  floor-div sites in a single run. Framed as a defensive-programming
+  follow-on; to be filed as a separate upstream issue modelled on #125.
 - **One novel verification pattern** (nondet representative elements for
   fancy-index bound checks) which generalised across maxpooling, both
   interpolate variants, and is reusable for any mgrid-style code.
@@ -202,7 +225,9 @@ workarounds remain in source — the kernels are byte-for-byte faithful
 to the upstream NKI form for indexing, accumulation, slicing, and
 control flow.
 
-## Real upstream bug caught retroactively
+## Real upstream bugs caught
+
+### Retroactive — `aws-neuron/nki-samples#74`
 
 Surveying the `aws-neuron/nki-samples` git history for past bug-fix
 commits surfaced one that our verifier catches end-to-end:
@@ -219,6 +244,38 @@ counterexample. The target `matmul_hoist_load_historical` is now in
 the regression suite as a permanent demonstration: if a regression
 ever reintroduced the same class of allocation-vs-load shape
 mismatch, the suite would catch it before merge.
+
+### Prospective — `aws-neuron/nki-samples#125 → #126`
+
+The other catch was *not* retroactive: the bug was live in upstream
+when this PoC reached it. While reviewing the `contributed/`
+interpolate kernels, AUDIT-15 surfaced that both
+`interpolate_bilinear_2x_fwd` and `interpolate_trilinear_2x_fwd` share
+a host-side trip-count expression — `step_size = chunk_size - 1`;
+`math.ceil((dim - chunk_size) / step_size) + 1` — that divides by zero
+at JIT trace time when `chunk_size == 1`. The public signatures
+(`chunk_size: int = 10`) admit the value; the body cannot handle it.
+
+The standalone phase-2 target `audit15_hostarith_unguarded` mirrors
+only the trip-count expression and produces a CWE-369 counterexample
+with `chunk_size = 1 → step_size = 0`. Reported as
+[aws-neuron/nki-samples#125](https://github.com/aws-neuron/nki-samples/issues/125)
+and closed by upstream
+[PR #126](https://github.com/aws-neuron/nki-samples/pull/126), which
+adopted both proposed preconditions: `assert chunk_size >= 2` and
+`assert dim >= chunk_size`. The second precondition also closes the
+silent-empty-output boundary (`x_src = 1` with `chunk_size >= 2`)
+that shape-and-bounds verification cannot itself detect — a piece of
+"completeness via upstream contract tightening" the AUDIT entry calls
+out as a soundness-vs-completeness limit.
+
+The three regression-pinned targets (`audit15_hostarith_unguarded` in
+phase-2, plus `interpolate_bilinear_chunk1` and
+`interpolate_trilinear_chunk1` in phase-1) all now serve as
+regressions on the upstream fix: if a future revert removed either
+precondition, all three would re-fire.
+
+### Not caught
 
 One historical fix is *not* caught:
 [PR #89](https://github.com/aws-neuron/nki-samples/pull/89) (using
