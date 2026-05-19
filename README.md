@@ -14,10 +14,13 @@ The verifier runs in two phases:
   via stub asserts. Contract violations surface as precise counterexamples.
 - **Phase 2 (`--overflow-check`, default div-by-zero)** — safety
   properties on host-side index arithmetic. Signed-integer overflow and
-  integer division-by-zero, mapped to CWE-190 / CWE-369. Rediscovers
-  the upstream AUDIT-15 `ZeroDivisionError` on `chunk_size = 1`
-  *without* relying on the port-time precondition that currently
-  guards it. Audit-style targets (today: `audit15_hostarith_unguarded`)
+  integer division-by-zero, mapped to CWE-190 / CWE-369. Reproduces
+  the `ZeroDivisionError` (CWE-369) on the upstream trip-count
+  expression at `chunk_size = 1` that motivated
+  [aws-neuron/nki-samples#125](https://github.com/aws-neuron/nki-samples/issues/125)
+  — now fixed upstream by [PR #126](https://github.com/aws-neuron/nki-samples/pull/126),
+  which adopted the preconditions this PoC proposed. Audit-style
+  targets (today: `audit15_hostarith_unguarded`)
   additionally pass `--multi-property` so ESBMC enumerates every
   violated property in one run rather than stopping at the first —
   useful when a host-arithmetic reproducer exercises multiple at-risk
@@ -39,6 +42,15 @@ about two seconds on a laptop:
 (The figure regenerates from
 [`figures/bug_pr74.html`](figures/bug_pr74.html) — open it in a browser
 for the same rendering at any zoom level.)
+
+The same PoC also catches host-side arithmetic bugs *prospectively*.
+[aws-neuron/nki-samples#125](https://github.com/aws-neuron/nki-samples/issues/125)
+(`ZeroDivisionError` at JIT trace time in the
+`interpolate_{bi,tri}linear_2x_fwd` chunking math when `chunk_size == 1`)
+was reported from this PoC and closed by upstream
+[PR #126](https://github.com/aws-neuron/nki-samples/pull/126), which
+applied the `chunk_size >= 2` / `dim >= chunk_size` preconditions
+proposed in the AUDIT-15 write-up verbatim.
 
 ## Layout
 
@@ -82,7 +94,8 @@ asserts the kernel's output contract.
 | `interpolate_trilinear_buggy` | `interpolate_trilinear_buggy.py` | `kernels/interpolate_trilinear_buggy.py` | `FAILED` |
 | `interpolate_bilinear_chunk1` | `interpolate_bilinear_chunk1.py` | `kernels/interpolate_bilinear.py` | `FAILED` — chunk_size=1 boundary input (AUDIT Finding 15) |
 | `interpolate_trilinear_chunk1` | `interpolate_trilinear_chunk1.py` | `kernels/interpolate_trilinear.py` | `FAILED` — same boundary as bilinear |
-| `audit15_hostarith_unguarded` | `audit15_hostarith_unguarded.py` | — (standalone) | phase-2 only: `FAILED` with `division by zero` (CWE-369) on the upstream trip-count expression at `chunk_size = 1` |
+| `audit15_hostarith_unguarded` | `audit15_hostarith_unguarded.py` | — (standalone) | phase-2 only: `FAILED` with `division by zero` (CWE-369) on the upstream trip-count expression at `chunk_size = 1` (now regressed against upstream PR [#126](https://github.com/aws-neuron/nki-samples/pull/126)) |
+| `avgpool_hostarith_unguarded` | `avgpool_hostarith_unguarded.py` | — (standalone) | phase-2 only: `FAILED` with `division by zero` (CWE-369) on the upstream `tensor_avgpool_kernel` floor-divs at `pool_size = 0` — `--multi-property` surfaces both `sz_hout` and `sz_wout` sites in one run (AUDIT Finding 16) |
 | `matmul_basic` | `matmul_basic.py` | `kernels/matmul_basic.py` | `SUCCESSFUL` |
 | `matmul_basic_buggy` | `matmul_basic_buggy.py` | `kernels/matmul_basic_buggy.py` | `FAILED` |
 | `mamba_v1` | `mamba_v1.py` | `kernels/mamba_v1.py` | `SUCCESSFUL` |

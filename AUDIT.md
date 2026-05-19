@@ -515,19 +515,32 @@ fires on the floor-div, producing a counterexample with
 `chunk_size = 1 → step_size = 0` (CWE-369). This is an independent
 witness for the same upstream bug: phase-1 catches it via the assert,
 phase-2 catches it via the safety property the assert was added to
-guard against. If the port-time precondition were dropped and the
-upstream kernel patched to validate `chunk_size >= 2` directly, the
-phase-2 target would shift to `SUCCESSFUL` — making it a faithful
-regression on the upstream fix rather than on our port deviation.
+guard against. Now that upstream is patched (see *Filed upstream?*
+below), the standalone phase-2 reproducer is a faithful regression on
+the upstream fix rather than on our port-time deviation: a future
+revert of the upstream precondition would re-fire it.
 
 ### Filed upstream?
 
-Reported as `aws-neuron/nki-samples` issue (pending). The upstream
-kernels would benefit from:
-- explicit `assert chunk_size >= 2`
-- explicit `assert h_src >= 2` / `d_src >= 2`
-or equivalent docstring preconditions if the kernels are intended only
-for non-degenerate input.
+Reported as
+[aws-neuron/nki-samples#125](https://github.com/aws-neuron/nki-samples/issues/125)
+(2026-05) and **closed by upstream
+[PR #126](https://github.com/aws-neuron/nki-samples/pull/126)** (*fix:
+validate chunk_size and source dim in
+interpolate_{bi,tri}linear_2x_fwd*). Upstream applied the preconditions
+we proposed verbatim:
+- `assert chunk_size >= 2` (so `step_size = chunk_size - 1` is positive)
+- `assert h_src >= chunk_size` (and the equivalent on `d_src` for
+  trilinear) — closes the zero-trip "silent empty output" boundary
+  described above.
+
+Both regressions in the suite now pin the upstream fix: the standalone
+`audit15_hostarith_unguarded` phase-2 target tracks the
+`chunk_size >= 2` invariant on the bare trip-count expression, and the
+two `interpolate_{bi,tri}linear_chunk1` phase-1 targets exercise the
+same `chunk_size = 1` boundary against the full kernel. If a future
+upstream revert removed either precondition, all three would flip back
+to `FAILED`.
 
 ### Lesson
 
@@ -598,13 +611,21 @@ Witness: `pool_size = 0` reaches both sites.
 
 ### Filed upstream?
 
-To be reported as a **defensive-programming follow-up to
-[#125](https://github.com/aws-neuron/nki-samples/issues/125)**, not as
-a security-relevant finding in its own right. The upstream
-`tensor_avgpool_kernel` would benefit from one of:
+To be filed as a **separate follow-on upstream issue**, modelled on
+the [#125](https://github.com/aws-neuron/nki-samples/issues/125) →
+[#126](https://github.com/aws-neuron/nki-samples/pull/126) precedent
+but on its own ticket: #126 landed only on the interpolate kernels and
+left `tutorials/average_pool2d/tensor_avgpool_kernel` untouched. Frame
+the filing explicitly as defensive-programming, *not* as a
+security-relevant finding — the trigger value `pool_size = 0` is
+unambiguously invalid and no realistic workflow would supply it. Since
+#125 was accepted upstream essentially as-proposed, the bar for filing
+#126-style follow-ons is low. The ask is one of:
 - explicit `assert pool_size >= 1`
 - type annotation `pool_size: int` with a documented `>= 1`
   precondition
+
+Cross-reference the new issue from this section once opened.
 
 ### What this PoC target actually proves
 
