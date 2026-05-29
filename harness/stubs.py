@@ -9,6 +9,22 @@
 # without updating the audit. Contracts are stated as plain `assert`
 # statements so ESBMC catches violations on every path.
 
+# ============================================================== Partition axis
+# Which axis of a multi-axis on-chip tile is the hardware partition
+# dimension (the one limited to PMAX). 2-D tiles are always par=d0.
+# 3-D tiles come in two conventions, so the partition axis is carried
+# explicitly on Tile3D and declared at every nl_ndarray_3d call site
+# (AUDIT Finding 11):
+#   PAR_D0 — par_dim is d0 (avgpool, interpolate, pipelined_attention).
+#   PAR_D1 — (slabs=d0, par_dim=d1, free=d2): matmul family, attn_fwd_v3,
+#            fused_mamba.
+# Tile4D / Tile5D are always par=d0 by construction.
+# Defined before the Tile classes so the class methods can reference them
+# (ESBMC's Python frontend resolves a global only if it precedes the use).
+
+PAR_D0: int = 0
+PAR_D1: int = 1
+
 # ============================================================== Types
 
 class Tile:
@@ -43,14 +59,18 @@ class Tile:
         return Tile(r1 - r0, c1 - c0, self.dtype, self.buffer)
 
 class Tile3D:
-    """Rank-3 tile: shape (d0, d1, d2). For matmul-style (slabs, par_dim, free) layouts."""
-    def __init__(self, d0: int, d1: int, d2: int, dtype: int, buffer: int):
+    """Rank-3 tile: shape (d0, d1, d2). `par_axis` declares which axis is
+    the hardware partition dimension — PAR_D0 (par=d0) or PAR_D1
+    (slabs=d0, par_dim=d1, free=d2). See AUDIT Finding 11."""
+    def __init__(self, d0: int, d1: int, d2: int, dtype: int, buffer: int,
+                 par_axis: int):
         self.d0: int = d0
         self.d1: int = d1
         self.d2: int = d2
         self.shape: tuple = (d0, d1, d2)
         self.dtype: int = dtype
         self.buffer: int = buffer
+        self.par_axis: int = par_axis
 
     def __getitem__(self, key) -> "Tile":
         """`t[k, sl1, sl2]` — leading scalar + two range axes, returning a Tile view.
@@ -74,6 +94,7 @@ class Tile3D:
         assert 0 <= c0
         assert c0 <= c1
         assert c1 <= self.d2
+        assert self.par_axis == PAR_D1
         return Tile(r1 - r0, c1 - c0, self.dtype, self.buffer)
 
     def __setitem__(self, key, value: "Tile") -> None:
@@ -93,6 +114,7 @@ class Tile3D:
         assert 0 <= c0
         assert c0 <= c1
         assert c1 <= self.d2
+        assert self.par_axis == PAR_D1
         assert value.d0 == (r1 - r0)
         assert value.d1 == (c1 - c0)
         assert value.dtype == self.dtype
@@ -186,18 +208,25 @@ def nl_ndarray_2d(d0: int, d1: int, dtype: int, buffer: int) -> Tile:
 def nl_zeros_2d(d0: int, d1: int, dtype: int, buffer: int) -> Tile:
     return nl_ndarray_2d(d0, d1, dtype, buffer)
 
-# nl.ndarray((d0, d1, d2), dtype, buffer)
-# For (slabs, par_dim, free) layouts, par_dim is d1.
-def nl_ndarray_3d(d0: int, d1: int, d2: int, dtype: int, buffer: int) -> Tile3D:
+# nl.ndarray((d0, d1, d2), dtype, buffer, par_axis)
+# par_axis declares the partition dimension (PAR_D0 or PAR_D1); the PMAX
+# limit is applied to that axis on SBUF/PSUM. d2 is always a free axis.
+def nl_ndarray_3d(d0: int, d1: int, d2: int, dtype: int, buffer: int,
+                  par_axis: int) -> Tile3D:
     assert d0 > 0
     assert d1 > 0
     assert d2 > 0
+    assert par_axis == PAR_D0 or par_axis == PAR_D1
     if buffer == BUF_SBUF or buffer == BUF_PSUM:
-        assert d1 <= PMAX
-    return Tile3D(d0, d1, d2, dtype, buffer)
+        if par_axis == PAR_D0:
+            assert d0 <= PMAX
+        else:
+            assert d1 <= PMAX
+    return Tile3D(d0, d1, d2, dtype, buffer, par_axis)
 
-def nl_zeros_3d(d0: int, d1: int, d2: int, dtype: int, buffer: int) -> Tile3D:
-    return nl_ndarray_3d(d0, d1, d2, dtype, buffer)
+def nl_zeros_3d(d0: int, d1: int, d2: int, dtype: int, buffer: int,
+                par_axis: int) -> Tile3D:
+    return nl_ndarray_3d(d0, d1, d2, dtype, buffer, par_axis)
 
 # ============================================================== Load / store (implicit-slice)
 
@@ -429,7 +458,7 @@ def nl_load_fancy_2d_to_3d(src: Tile,
     assert out_d1 > 0
     assert out_d2 > 0
     assert out_d1 <= PMAX
-    return Tile3D(out_d0, out_d1, out_d2, dtype, BUF_SBUF)
+    return Tile3D(out_d0, out_d1, out_d2, dtype, BUF_SBUF, PAR_D1)
 
 # Masked 2-D fancy store from a 2-D SBUF tile back into a 2-D HBM tensor.
 #   nl.store(dst[row_idx, col_idx], value=tile, mask=(row_idx < mask_max_row))
@@ -481,7 +510,8 @@ def nl_load_fancy_3d_to_3d(src: Tile3D,
     assert out_d1 > 0
     assert out_d2 > 0
     assert out_d0 <= PMAX
-    return Tile3D(out_d0, out_d1, out_d2, dtype, BUF_SBUF)
+    assert src.par_axis == PAR_D0
+    return Tile3D(out_d0, out_d1, out_d2, dtype, BUF_SBUF, PAR_D0)
 
 # Masked 3-D fancy store: SBUF 3-D tile -> HBM 3-D tensor, mask on partition axis.
 def nl_store_fancy_3d(dst: Tile3D,
@@ -506,6 +536,7 @@ def nl_store_fancy_3d(dst: Tile3D,
         assert h < dst.d1
         assert 0 <= w
         assert w < dst.d2
+    assert dst.par_axis == PAR_D0
     assert dst.dtype == value.dtype
 
 # Allocation for 4-D tiles. d0 is the partition axis.
@@ -784,6 +815,7 @@ def nisa_nc_transpose(dst: Tile, data: Tile) -> None:
 # (src.d1) becomes the SBUF partition dim and must fit in PMAX (AUDIT
 # Finding 14).
 def nl_load_3d_slot(src: Tile3D, k: int) -> Tile:
+    assert src.par_axis == PAR_D1
     assert 0 <= k
     assert k < src.d0
     assert src.d1 <= PMAX
@@ -792,6 +824,7 @@ def nl_load_3d_slot(src: Tile3D, k: int) -> Tile:
 # nl.store(dst[k], value) — write a 2-D SBUF tile into the k-th slab of
 # a 3-D HBM tile. Shape match (and partition-dim discipline) preserved.
 def nl_store_3d_slot(dst: Tile3D, k: int, value: Tile) -> None:
+    assert dst.par_axis == PAR_D1
     assert 0 <= k
     assert k < dst.d0
     assert value.d0 == dst.d1
@@ -803,6 +836,7 @@ def nl_store_3d_slot(dst: Tile3D, k: int, value: Tile) -> None:
 # dim (r1 - r0) must fit in PMAX (AUDIT Finding 14).
 def nl_load_3d_at(src: Tile3D, i: int, r0: int, r1: int,
                   c0: int, c1: int) -> Tile:
+    assert src.par_axis == PAR_D1
     assert 0 <= i
     assert i < src.d0
     assert 0 <= r0
@@ -829,6 +863,7 @@ def nl_mgrid_2d(p_lo: int, p_hi: int, f_lo: int, f_hi: int) -> tuple:
 # The partition-axis extent must fit in PMAX (AUDIT Finding 14).
 def nl_load_3d_fancy(src: Tile3D, k: int,
                      ax1: IndexTensor, ax2: IndexTensor) -> Tile:
+    assert src.par_axis == PAR_D1
     assert 0 <= k
     assert k < src.d0
     m: int = nondet_int()
@@ -852,6 +887,7 @@ def nl_load_3d_fancy(src: Tile3D, k: int,
 def nl_store_3d_fancy(dst: Tile3D, k: int,
                       ax1: IndexTensor, ax2: IndexTensor,
                       value: Tile) -> None:
+    assert dst.par_axis == PAR_D1
     assert 0 <= k
     assert k < dst.d0
     m: int = nondet_int()
@@ -899,6 +935,7 @@ def tile3d_ap_5d(src: Tile3D,
                  s2: int, c2: int,
                  s3: int, c3: int,
                  s4: int, c4: int) -> Tile5D:
+    assert src.par_axis == PAR_D0
     assert c0 > 0
     assert c1 > 0
     assert c2 > 0
@@ -919,7 +956,7 @@ def tile3d_ap_5d(src: Tile3D,
 # nl.sum(tile5d, axis=[3, 4]) — sum-reduce the last two axes of a 5-D
 # view, producing a 3-D tile with the leading three axes preserved.
 def nl_sum_5d_axes34_to_3d(t: Tile5D, dtype: int) -> Tile3D:
-    return Tile3D(t.d0, t.d1, t.d2, dtype, t.buffer)
+    return Tile3D(t.d0, t.d1, t.d2, dtype, t.buffer, PAR_D0)
 
 # nisa.tensor_scalar(dst, data, op, operand) on 3-D tiles — shape
 # passthrough. The scalar operand does not enter the shape contract;
@@ -1003,6 +1040,7 @@ def nl_store_4d_fancy_par_first(dst: Tile4D,
 def nl_slice_3d_par_first(src: Tile3D,
                           ax_p: IndexTensor,
                           k1: int, k2: int) -> Tile:
+    assert src.par_axis == PAR_D0
     p: int = nondet_int()
     __ESBMC_assume(ax_p.low <= p)
     __ESBMC_assume(p < ax_p.high)
@@ -1038,6 +1076,7 @@ def nisa_tensor_scalar_reduce(data: Tile, reduce_res: Tile) -> Tile:
 # and `prev_runnning_max[grp_i]` shorthands (which drop the leading
 # grp_i axis on the upstream's par_dim-second layout).
 def nl_slice_3d_drop_d1(src: Tile3D, k: int) -> Tile:
+    assert src.par_axis == PAR_D0
     assert 0 <= k
     assert k < src.d1
     return Tile(src.d0, src.d2, src.dtype, src.buffer)
@@ -1052,6 +1091,7 @@ def nl_store_3d_par_first(dst: Tile3D,
                           ax_p: IndexTensor,
                           k1: int, k2: int,
                           value: Tile) -> None:
+    assert dst.par_axis == PAR_D0
     p: int = nondet_int()
     __ESBMC_assume(ax_p.low <= p)
     __ESBMC_assume(p < ax_p.high)
@@ -1235,6 +1275,7 @@ def nl_slice_4d_drop_d1d2(src: Tile4D, k1: int, k2: int) -> Tile:
 # nl_slice_3d_drop_d1 for the store direction. Used for
 # `mm2_sbuf[ip_mm2, grp_i, if_mm2] = nl.loop_reduce(...)`.
 def nl_store_3d_drop_d1(dst: Tile3D, k: int, value: Tile) -> None:
+    assert dst.par_axis == PAR_D0
     assert 0 <= k
     assert k < dst.d1
     assert value.d0 == dst.d0

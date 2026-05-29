@@ -14,9 +14,9 @@ d: int        = 128
 seqlen_q: int = 2048
 seqlen_k: int = 2048
 
-q: Tile3D = nl_ndarray_3d(b, d,        seqlen_q, DT_F16, BUF_SHARED_HBM)
-k: Tile3D = nl_ndarray_3d(b, d,        seqlen_k, DT_F16, BUF_SHARED_HBM)
-v: Tile3D = nl_ndarray_3d(b, seqlen_k, d,        DT_F16, BUF_SHARED_HBM)
+q: Tile3D = nl_ndarray_3d(b, d,        seqlen_q, DT_F16, BUF_SHARED_HBM, PAR_D1)
+k: Tile3D = nl_ndarray_3d(b, d,        seqlen_k, DT_F16, BUF_SHARED_HBM, PAR_D1)
+v: Tile3D = nl_ndarray_3d(b, seqlen_k, d,        DT_F16, BUF_SHARED_HBM, PAR_D1)
 
 o: Tile3D = flash_fwd_exp_only(q, k, v)
 

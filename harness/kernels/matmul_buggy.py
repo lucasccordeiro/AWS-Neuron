@@ -31,15 +31,15 @@ def matmul_kernel(A_DRAM: Tile, B_DRAM: Tile,
         for m2 in nl_affine_range(NUM_BLOCK_M):
             Z_SBUF: Tile3D = nl_zeros_3d(TILES_IN_BLOCK_M, TILE_M,
                                          TILES_IN_BLOCK_N * TILE_N,
-                                         Z_DRAM.dtype, BUF_SBUF)
+                                         Z_DRAM.dtype, BUF_SBUF, PAR_D1)
 
             for k2 in nl_affine_range(NUM_BLOCK_K):
                 A_SBUF: Tile3D = nl_ndarray_3d(TILES_IN_BLOCK_K, TILE_K,
                                                TILES_IN_BLOCK_M * TILE_M,
-                                               A_DRAM.dtype, BUF_SBUF)
+                                               A_DRAM.dtype, BUF_SBUF, PAR_D1)
                 B_SBUF: Tile3D = nl_ndarray_3d(TILES_IN_BLOCK_K, TILE_K,
                                                TILES_IN_BLOCK_N * TILE_N,
-                                               B_DRAM.dtype, BUF_SBUF)
+                                               B_DRAM.dtype, BUF_SBUF, PAR_D1)
 
                 for k1 in nl_affine_range(TILES_IN_BLOCK_K):
                     k_start_a: int = k2 * TILES_IN_BLOCK_K * TILE_K + k1 * TILE_K

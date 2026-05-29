@@ -36,7 +36,7 @@ def nki_matmul_fully_optimized(lhsT: Tile, rhs: Tile,
         # result_tmps[m_idx][bm_idx][bn_idx] flattened to one slab axis.
         result_tmps: Tile3D = nl_ndarray_3d(
             NUM_BLOCK_M * TILES_IN_BLOCK_M * TILES_IN_BLOCK_N,
-            TILE_M, TILE_N, lhsT.dtype, BUF_SBUF)
+            TILE_M, TILE_N, lhsT.dtype, BUF_SBUF, PAR_D1)
         for m_idx in nl_affine_range(NUM_BLOCK_M):
             for bm_idx in nl_affine_range(TILES_IN_BLOCK_M):
                 for bn_idx in nl_affine_range(TILES_IN_BLOCK_N):
@@ -45,7 +45,7 @@ def nki_matmul_fully_optimized(lhsT: Tile, rhs: Tile,
 
         for k in nl_affine_range(NUM_BLOCK_K):
             rhs_tiles: Tile3D = nl_ndarray_3d(TILES_IN_BLOCK_K, TILE_K, BLOCK_N,
-                                              rhs.dtype, BUF_SBUF)
+                                              rhs.dtype, BUF_SBUF, PAR_D1)
             for bk_r in nl_affine_range(TILES_IN_BLOCK_K):
                 k_idx: int = TILES_IN_BLOCK_K * k + bk_r
                 # BUG: K-end of the rhs slice is (k_idx+2) instead of (k_idx+1).
@@ -55,7 +55,7 @@ def nki_matmul_fully_optimized(lhsT: Tile, rhs: Tile,
 
             for m in nl_affine_range(NUM_BLOCK_M):
                 lhsT_tiles: Tile3D = nl_ndarray_3d(TILES_IN_BLOCK_K, TILE_K, BLOCK_M,
-                                                   lhsT.dtype, BUF_SBUF)
+                                                   lhsT.dtype, BUF_SBUF, PAR_D1)
                 for bk_l in nl_affine_range(TILES_IN_BLOCK_K):
                     k_idx2: int = TILES_IN_BLOCK_K * k + bk_l
                     lhsT_tiles[bk_l, :, :] = nl_load_2d(

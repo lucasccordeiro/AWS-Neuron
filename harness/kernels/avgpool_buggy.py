@@ -12,13 +12,13 @@ def tensor_avgpool_kernel(in_tensor: Tile3D, pool_size: int) -> Tile3D:
     sz_wout: int = sz_win // pool_size
 
     out_tensor: Tile3D = nl_ndarray_3d(sz_cin, sz_hout, sz_wout,
-                                       in_tensor.dtype, BUF_SHARED_HBM)
+                                       in_tensor.dtype, BUF_SHARED_HBM, PAR_D0)
 
     sz_p: int = sz_cin
     sz_pool: int = pool_size
 
     in_tile: Tile3D = nl_ndarray_3d(sz_cin, sz_hin, sz_win,
-                                    in_tensor.dtype, BUF_SBUF)
+                                    in_tensor.dtype, BUF_SBUF, PAR_D0)
     nisa_dma_copy_3d(in_tile, in_tensor)
 
     pool_view: Tile5D = tile3d_ap_5d(
@@ -32,7 +32,7 @@ def tensor_avgpool_kernel(in_tensor: Tile3D, pool_size: int) -> Tile3D:
     sum_tile: Tile3D = nl_sum_5d_axes34_to_3d(pool_view, in_tile.dtype)
 
     out_tile: Tile3D = nl_ndarray_3d(sum_tile.d0, sum_tile.d1, sum_tile.d2,
-                                     sum_tile.dtype, BUF_SBUF)
+                                     sum_tile.dtype, BUF_SBUF, PAR_D0)
     nisa_tensor_scalar_3d(out_tile, sum_tile)
 
     nisa_dma_copy_3d(out_tensor, out_tile)

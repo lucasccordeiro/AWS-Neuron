@@ -21,7 +21,7 @@ __ESBMC_assume(k_w <= 2)
 H: int = 6 + 2 * k_h
 W: int = 6 + 2 * k_w
 
-in_tensor: Tile3D = nl_ndarray_3d(C, H, W, DT_F16, BUF_SHARED_HBM)
+in_tensor: Tile3D = nl_ndarray_3d(C, H, W, DT_F16, BUF_SHARED_HBM, PAR_D0)
 out: Tile3D = tensor_avgpool_kernel(in_tensor, POOL)
 
 assert out.d0 == C
