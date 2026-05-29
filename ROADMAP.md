@@ -127,3 +127,15 @@ Skip unless dtype modelling becomes a goal.
 | + pipelined_attention `pv` partial port | 55 | **DONE** |
 | + pipelined_attention `write_back` + `flash_fwd_full` (full inner pipeline) | 56 | **DONE** |
 | + `attn_fwd_v1_asym` good + buggy (closes v1 toy-shape blind spot) | 58 | **DONE** |
+| + `matmul_basic_symbolic` (dtype sweep; completes matmul-tutorial symbolic set) | 59 | **DONE** |
+
+`matmul_basic` was the lone matrix_multiplication-tutorial variant without
+a symbolic twin. The gap was structural, not an oversight: the upstream
+basic kernel hard-asserts `K==128, M==64, N==512` (single-tile, no tiling
+loop), so a *shape* sweep is vacuous — any other shape trips the kernel's
+own preconditions. `matmul_basic_symbolic` instead sweeps the one
+meaningful symbolic axis for a fixed-shape kernel: the input dtype over
+`{BF16, F16, F32}`, certifying the dtype-passthrough + F32-PSUM-accumulate
+contract for every supported input dtype in one run (the concrete
+`matmul_basic` target, fixed at F16, is blind to this). No `--unwind`
+needed — the kernel has no loops.

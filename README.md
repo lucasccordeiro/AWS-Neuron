@@ -98,6 +98,7 @@ asserts the kernel's output contract.
 | `avgpool_hostarith_unguarded` | `avgpool_hostarith_unguarded.py` | — (standalone) | phase-2 only: `FAILED` with `division by zero` (CWE-369) on the upstream `tensor_avgpool_kernel` floor-divs at `pool_size = 0` — `--multi-property` surfaces both `sz_hout` and `sz_wout` sites in one run (AUDIT Finding 16) |
 | `matmul_basic` | `matmul_basic.py` | `kernels/matmul_basic.py` | `SUCCESSFUL` |
 | `matmul_basic_buggy` | `matmul_basic_buggy.py` | `kernels/matmul_basic_buggy.py` | `FAILED` |
+| `matmul_basic_symbolic` | `matmul_basic_symbolic.py` | `kernels/matmul_basic.py` | `SUCCESSFUL` (dtype sweep; input dtype ∈ {BF16, F16, F32}; no `--unwind`) |
 | `mamba_v1` | `mamba_v1.py` | `kernels/mamba_v1.py` | `SUCCESSFUL` |
 | `mamba_v1_buggy` | `mamba_v1_buggy.py` | `kernels/mamba_v1_buggy.py` | `FAILED` |
 | `transpose2d_symbolic` | `transpose2d_symbolic.py` | `kernels/transpose2d.py` | `SUCCESSFUL` (`--unwind 5`; F1, F2 ∈ [1, 4]) |
@@ -163,10 +164,15 @@ Concrete-shape targets complete in 1–3 seconds wall-clock each on a
 stock laptop. The thirteen symbolic-shape targets run for ~5–90
 seconds depending on the size of the shape family they sweep —
 eleven of the thirteen `--unwind` values are k-induction-certified
-complete (see `REPORT.md` for the table). Phase-1 (58 runs) finishes
-in about 14 minutes; phase-2 (38 runs — every concrete- and
-symbolic-shape good kernel plus the AUDIT-15 reproducer) finishes in
-about 11 minutes; the combined two-phase sweep is ~26 minutes end-to-end.
+complete (see `REPORT.md` for the table). One further symbolic target,
+`matmul_basic_symbolic`, sweeps the *dtype* axis rather than shape (the
+basic kernel is fixed at 64×128×512, so a shape sweep is vacuous): it
+certifies the dtype-passthrough contract for every supported input
+dtype in one run and needs no `--unwind` since the kernel has no loops.
+Phase-1 (59 runs) finishes in about 14 minutes; phase-2 (39 runs —
+every concrete- and symbolic-shape good kernel plus the AUDIT-15
+reproducer) finishes in about 11 minutes; the combined two-phase sweep
+is ~26 minutes end-to-end.
 
 ## Where to read more
 
