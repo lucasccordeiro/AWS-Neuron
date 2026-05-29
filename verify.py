@@ -21,7 +21,7 @@ Two phases:
 
 Usage:
   python3 verify.py              # run both phases for every target
-  python3 verify.py <name>       # run a single target by manifest name
+  python3 verify.py <name>...    # run one or more targets by manifest name
   python3 verify.py --phase=1    # phase-1 only
   python3 verify.py --phase=2    # phase-2 only
 
@@ -210,11 +210,13 @@ def main(argv: list[str]) -> int:
         args = args[1:]
 
     targets = MANIFEST
-    if len(args) == 1:
-        targets = [t for t in MANIFEST if t.name == args[0]]
-        if not targets:
-            print(f"unknown target: {args[0]}", file=sys.stderr)
+    if args:
+        wanted = dict.fromkeys(args)
+        unknown = [name for name in wanted if not any(t.name == name for t in MANIFEST)]
+        if unknown:
+            print(f"unknown target(s): {', '.join(unknown)}", file=sys.stderr)
             return 2
+        targets = [t for t in MANIFEST if t.name in wanted]
 
     print(f"{'Target':<32} {'Phase':<6} {'Expected':<12} {'Actual':<12} {'Result'}")
     print("-" * 78)
