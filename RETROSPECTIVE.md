@@ -77,7 +77,9 @@ assumes familiarity with the verifier but not with NKI.
   produced Finding 15. First end-to-end exercise of `_SAFETY_AUDIT`
   (`--overflow-check --multi-property`): ESBMC enumerates both
   floor-div sites in a single run. Framed as a defensive-programming
-  follow-on; to be filed as a separate upstream issue modelled on #125.
+  follow-on and filed as
+  [aws-neuron/nki-samples#127](https://github.com/aws-neuron/nki-samples/issues/127)
+  (OPEN), a separate ticket modelled on #125.
 - **One novel verification pattern** (nondet representative elements for
   fancy-index bound checks) which generalised across maxpooling, both
   interpolate variants, and is reusable for any mgrid-style code.
