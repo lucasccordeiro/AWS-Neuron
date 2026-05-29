@@ -126,6 +126,7 @@ MANIFEST: list[Target] = [
     Target("avgpool_hostarith_unguarded","avgpool_hostarith_unguarded.py",(),                None,         _SAFETY_AUDIT, "FAILED"),
     Target("matmul_basic",               "matmul_basic.py",               (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("matmul_basic_buggy",         "matmul_basic_buggy.py",         (),                "FAILED"),
+    Target("matmul_basic_symbolic",      "matmul_basic_symbolic.py",      (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("mamba_v1",                   "mamba_v1.py",                   (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("mamba_v1_buggy",             "mamba_v1_buggy.py",             (),                "FAILED"),
     Target("transpose2d_symbolic",       "transpose2d_symbolic.py",       ("--unwind", "5"), "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
