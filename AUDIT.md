@@ -247,7 +247,7 @@ incident waiting to happen at the next port.
 
 ---
 
-## Finding 11 — `tile3d_ap_5d` partition-axis alignment is not enforced
+## Finding 11 — `tile3d_ap_5d` partition-axis alignment (closed)
 
 Surfaced during the Tier-2 average_pool2d port code review.
 
@@ -264,22 +264,24 @@ in SBUF or PSUM. The contract is sufficient to prove that every
 element accessed via the view stays inside the source's flat allocation,
 which is what shape-and-bounds verification requires.
 
-**Soundness gap**: NeuronCore's physical SBUF/PSUM partition axis is
-not a permutation of the source's flat allocation. The .ap() view's
-first axis must *align* with the source's partition axis on real
-hardware; otherwise the view crosses partition boundaries and is
-hardware-invalid even though every accessed element is inside the
-allocation. The current contract does not enforce this alignment.
+**Soundness gap (closed in Increment 2)**: NeuronCore's physical
+SBUF/PSUM partition axis is not a permutation of the source's flat
+allocation. The .ap() view's first axis must *align* with the source's
+partition axis on real hardware; otherwise the view crosses partition
+boundaries and is hardware-invalid even though every accessed element is
+inside the allocation.
 
 Concretely, a kernel could declare `s0 = 1, c0 = PMAX` on a Tile3D
-with `src.d0 = 1, src.d1 = 4, src.d2 = 32` (SBUF, total volume 128)
-and our contract would accept it — yet on hardware this would read
-across the partition axis in a way the NKI runtime would reject.
+with `src.d0 = 1, src.d1 = 4, src.d2 = 32` (SBUF, total volume 128):
+every flat offset is in bounds (`max_offset = 127 < 128`) and
+`c0 <= PMAX`, yet on hardware this reads across the partition axis. The
+original contract accepted it. Increment 2 now rejects exactly this case
+(`assert s0 == src.d1 * src.d2` → `1 == 128` fails) — it is the
+`ap_partition_crossing` regression target.
 
-**Status (updated 2026-05-30)**: the prerequisite — resolving the
-Tile3D convention inconsistency — is now **fixed** (Increment 1); the
-`.ap()` partition-major stride-alignment proof itself remains
-**deferred** (Increment 2).
+**Status (updated 2026-05-30)**: **closed.** Both increments are done —
+the Tile3D convention inconsistency (Increment 1) and the `.ap()`
+partition-major stride-alignment proof (Increment 2).
 
 **Increment 1 — explicit `par_axis` attribute (done).** `Tile3D` now
 carries an explicit `par_axis` field (`PAR_D0` or `PAR_D1`), declared at
@@ -312,27 +314,36 @@ The two conventions in the corpus are now stated rather than assumed:
   (`PAR_D0`, read via the par-first family). Each is now tagged per
   tile by its actual consumer.
 
-**Increment 2 — `.ap()` stride alignment (deferred).** The soundness gap
-above — that `tile3d_ap_5d` does not check that view axis 0 strides
-whole partition-major slabs of the source — is **not yet closed**. With
-`par_axis` now explicit the principled fix is local: assert the `.ap()`
-view's first `(stride, count)` pair walks the source's declared
-partition axis in partition-major order. Tracked as the next increment.
+**Increment 2 — `.ap()` stride alignment (done).** For SBUF/PSUM sources,
+`tile3d_ap_5d` now asserts the view's axis-0 stride walks whole partition
+slabs: `assert s0 == src.d1 * src.d2`. The source is `PAR_D0`, so axis 0
+is the partition axis; requiring its stride to equal one partition slab
+(`d1*d2` elements) keeps the view from crossing partition boundaries. The
+partition-count bound `c0 <= src.d0` then follows from this together with
+the `max_offset` envelope. Pinned by the new positive control
+`ap_partition_crossing` (the adversarial example above), which fails at
+this assertion — and would flip back to SUCCESSFUL if it were removed.
+The assertion is gated on SBUF/PSUM residency because the constraint is a
+physical-partition concern; HBM sources have no partition axis.
 
 **Practical impact on this PoC**: every ported kernel's `.ap()`
 call uses physically meaningful strides (the upstream NKI tutorials
 are written by Annapurna engineers and respect the partition-axis
 discipline). The contract catches all the stride/count off-by-ones
-a shape-and-bounds checker is expected to catch, including the
-positive-control `avgpool_buggy` (`max_offset = 73 > 72`). The gap
-matters when reasoning about *adversarial* kernels, not the published
-samples.
+a shape-and-bounds checker is expected to catch — the positive control
+`avgpool_buggy` (`max_offset = 73 > 72`) for the flat-offset envelope,
+and now `ap_partition_crossing` (`s0 = 1 != d1*d2 = 128`) for the
+partition-major alignment. With Increment 2 the adversarial
+partition-crossing case is caught too, not just the published samples.
 
-**Lesson**: shape-and-bounds verification has a physical-residency
+**Lesson**: shape-and-bounds verification had a physical-residency
 blind spot. The PoC's value proposition ("if it verifies, the shape
-math is correct") holds; the stronger claim ("if it verifies, the
-kernel runs on hardware") needs the partition-axis discipline
-modelled explicitly.
+math is correct") always held; the stronger claim ("if it verifies, the
+kernel runs on hardware") needed the partition-axis discipline modelled
+explicitly — now done for the `.ap()` view via the explicit `par_axis`
+attribute (Increment 1) and the partition-major stride check
+(Increment 2). Other physical-residency constraints (bank conflicts,
+alignment) remain out of scope.
 
 ---
 

@@ -930,9 +930,12 @@ def nl_ndarray_5d(d0: int, d1: int, d2: int, d3: int, d4: int,
 # Maximum flat offset reached is sum_k(stride_k * (count_k - 1)) and
 # must be strictly less than the source's flat-element count
 # (src.d0 * src.d1 * src.d2). The view's first axis is the partition
-# axis when the source lives in SBUF/PSUM, so c0 ≤ PMAX is also required.
+# axis when the source lives in SBUF/PSUM, so c0 ≤ PMAX is required, and
+# its stride must walk whole partition slabs (s0 == src.d1 * src.d2) so
+# the view does not cross partition boundaries — see AUDIT Finding 11.
 #
-# This contract is shape-and-bounds: it does not check that the strides
+# Beyond the partition-axis alignment of axis 0, this contract is
+# shape-and-bounds: it does not check that the remaining strides
 # correspond to any meaningful reshape; it only proves that every
 # element reachable through the view is inside the source's allocation.
 def tile3d_ap_5d(src: Tile3D,
@@ -957,6 +960,14 @@ def tile3d_ap_5d(src: Tile3D,
     assert max_offset < src.d0 * src.d1 * src.d2
     if src.buffer == BUF_SBUF or src.buffer == BUF_PSUM:
         assert c0 <= PMAX
+        # Partition-major alignment (AUDIT Finding 11, Increment 2): the
+        # view's axis 0 is the partition axis (src is PAR_D0), so its stride
+        # must walk whole partition slabs — src.d1 * src.d2 elements each.
+        # Otherwise the view crosses SBUF/PSUM partition boundaries even when
+        # every flat offset is in bounds (the gap this finding documented).
+        # The partition-count bound c0 <= src.d0 then follows from this plus
+        # the max_offset envelope above.
+        assert s0 == src.d1 * src.d2
     return Tile5D(c0, c1, c2, c3, c4, src.dtype, src.buffer)
 
 # nl.sum(tile5d, axis=[3, 4]) — sum-reduce the last two axes of a 5-D
