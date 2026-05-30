@@ -19,7 +19,7 @@ __ESBMC_assume(k_w <= 2)
 H_SRC: int = CHUNK + k_h * (CHUNK - 1)
 W_SRC: int = CHUNK + k_w * (CHUNK - 1)
 
-src: Tile3D = nl_ndarray_3d(NC, H_SRC, W_SRC, DT_F32, BUF_HBM)
+src: Tile3D = nl_ndarray_3d(NC, H_SRC, W_SRC, DT_F32, BUF_HBM, PAR_D0)
 dst: Tile3D = interpolate_bilinear_2x_fwd(src, CHUNK)
 
 assert dst.d0 == NC

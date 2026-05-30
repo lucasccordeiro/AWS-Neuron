@@ -17,7 +17,7 @@ def interpolate_bilinear_2x_fwd(src_arr: Tile3D, chunk_size: int) -> Tile3D:
     assert chunk_size > 0
     assert h_src >= chunk_size
 
-    dst_arr: Tile3D = nl_ndarray_3d(nc, h_dst, w_dst, src_arr.dtype, BUF_SHARED_HBM)
+    dst_arr: Tile3D = nl_ndarray_3d(nc, h_dst, w_dst, src_arr.dtype, BUF_SHARED_HBM, PAR_D0)
 
     wdw_size: int  = chunk_size
     step_size: int = wdw_size - 1
@@ -41,7 +41,7 @@ def interpolate_bilinear_2x_fwd(src_arr: Tile3D, chunk_size: int) -> Tile3D:
 
         for p in nl_affine_range(p_tiles_count):
             out_tile: Tile3D = nl_ndarray_3d(PMAX, h_tile_size_dst, w_dst,
-                                             src_arr.dtype, BUF_SBUF)
+                                             src_arr.dtype, BUF_SBUF, PAR_D0)
 
             # ---- Load from HBM
             i_p:  IndexTensor = mgrid_axis(0, PMAX)

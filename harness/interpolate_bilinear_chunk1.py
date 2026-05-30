@@ -11,6 +11,6 @@
 from stubs import *
 from kernels.interpolate_bilinear import interpolate_bilinear_2x_fwd
 
-src: Tile3D = nl_ndarray_3d(8, 10, 10, DT_F32, BUF_HBM)
+src: Tile3D = nl_ndarray_3d(8, 10, 10, DT_F32, BUF_HBM, PAR_D0)
 dst: Tile3D = interpolate_bilinear_2x_fwd(src, 1)  # chunk_size = 1
 assert dst.d1 == 20

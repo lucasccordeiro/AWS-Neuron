@@ -12,7 +12,7 @@ def mamba_v1(delta: Tile3D, u: Tile3D, A: Tile, B: Tile3D, C: Tile3D) -> Tile3D:
     batch_size, channels, seq_len = delta.shape
 
     output: Tile3D = nl_ndarray_3d(batch_size, channels, seq_len,
-                                   delta.dtype, BUF_SHARED_HBM)
+                                   delta.dtype, BUF_SHARED_HBM, PAR_D1)
 
     _, state_size = A.shape
     assert A.d0 == channels

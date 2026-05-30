@@ -276,15 +276,48 @@ with `src.d0 = 1, src.d1 = 4, src.d2 = 32` (SBUF, total volume 128)
 and our contract would accept it — yet on hardware this would read
 across the partition axis in a way the NKI runtime would reject.
 
-**Status**: documented limitation; not patched. Tightening would
-require resolving an existing inconsistency in Tile3D conventions —
-the matmul-slab kernels treat `d1` as par_dim (encoded in
-`nl_ndarray_3d`'s SBUF assertion `d1 <= PMAX`), while the avgpool
-and mamba 3-D layouts treat `d0` as par_dim. A consistent
-partition-axis attribute on Tile3D, plus per-stub assertions that
-.ap() axis 0 strides whole partition-major slabs, is the principled
-fix — and it is a larger modelling exercise than this PoC has
-absorbed.
+**Status (updated 2026-05-30)**: the prerequisite — resolving the
+Tile3D convention inconsistency — is now **fixed** (Increment 1); the
+`.ap()` partition-major stride-alignment proof itself remains
+**deferred** (Increment 2).
+
+**Increment 1 — explicit `par_axis` attribute (done).** `Tile3D` now
+carries an explicit `par_axis` field (`PAR_D0` or `PAR_D1`), declared at
+every `nl_ndarray_3d` / `nl_zeros_3d` call site, and the SBUF/PSUM PMAX
+limit is applied to the *declared* axis rather than hardwired to `d1`.
+The two conventions in the corpus are now stated rather than assumed:
+
+  - **PAR_D1** `(slabs=d0, par_dim=d1, free=d2)`: matmul family,
+    attn_fwd_v3, and the **fused_mamba** family. *(This corrects an
+    error in this finding's original text, which grouped mamba with the
+    d0 kernels. `mamba` slices its `(batch, channels, seq_len)` Tile3D
+    on `d1 = channels` to PMAX and loads that as the SBUF partition dim
+    — verified in `kernels/mamba_v1.py:33-37` — so it is `d1`-par, the
+    same slab convention as matmul, not `d0`.)*
+  - **PAR_D0** `(par_dim=d0, ...)`: avgpool, interpolate, and the
+    par-axis-hoisted reduction tiles of pipelined_attention.
+
+  Each Tile3D-consuming stub now asserts the axis it assumes
+  (`par_axis == PAR_D1` on the slot / `Tile3D.__getitem__` / fancy-slab
+  family; `== PAR_D0` on `tile3d_ap_5d`, the fancy-d0 family, and the
+  par-first family), so a mis-declared axis now *fails* verification
+  instead of silently checking the wrong dimension.
+
+  **pipelined_attention is genuinely dual-convention** — surfaced while
+  closing this finding. Its `q`/`k`/`v`/`o` and `q_loaded`/`k_loaded`/
+  `v_loaded` tiles are slab (`PAR_D1`, fed to matmul via the
+  `nl_load_3d_fancy` path — exactly as the ROADMAP notes `v_loaded`
+  keeps the upstream par-on-d1 layout), while its `temp_reduce*` /
+  `final_reduce*` / `prev_*` / `mm2_*` reduction tiles are par-hoisted
+  (`PAR_D0`, read via the par-first family). Each is now tagged per
+  tile by its actual consumer.
+
+**Increment 2 — `.ap()` stride alignment (deferred).** The soundness gap
+above — that `tile3d_ap_5d` does not check that view axis 0 strides
+whole partition-major slabs of the source — is **not yet closed**. With
+`par_axis` now explicit the principled fix is local: assert the `.ap()`
+view's first `(stride, count)` pair walks the source's declared
+partition axis in partition-major order. Tracked as the next increment.
 
 **Practical impact on this PoC**: every ported kernel's `.ap()`
 call uses physically meaningful strides (the upstream NKI tutorials

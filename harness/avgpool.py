@@ -9,7 +9,7 @@ H: int    = 6
 W: int    = 6
 POOL: int = 2
 
-in_tensor: Tile3D = nl_ndarray_3d(C, H, W, DT_F16, BUF_SHARED_HBM)
+in_tensor: Tile3D = nl_ndarray_3d(C, H, W, DT_F16, BUF_SHARED_HBM, PAR_D0)
 out: Tile3D = tensor_avgpool_kernel(in_tensor, POOL)
 
 assert out.d0 == C

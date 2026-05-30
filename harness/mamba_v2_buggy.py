@@ -9,11 +9,11 @@ CHAN:  int = 128
 SEQ:   int = 4
 STATE: int = 2
 
-delta: Tile3D = nl_ndarray_3d(BATCH, CHAN, SEQ, DT_BF16, BUF_SHARED_HBM)
-u:     Tile3D = nl_ndarray_3d(BATCH, CHAN, SEQ, DT_BF16, BUF_SHARED_HBM)
+delta: Tile3D = nl_ndarray_3d(BATCH, CHAN, SEQ, DT_BF16, BUF_SHARED_HBM, PAR_D1)
+u:     Tile3D = nl_ndarray_3d(BATCH, CHAN, SEQ, DT_BF16, BUF_SHARED_HBM, PAR_D1)
 A:     Tile   = nl_ndarray_2d(CHAN, STATE,    DT_BF16, BUF_SHARED_HBM)
-B:     Tile3D = nl_ndarray_3d(BATCH, STATE, SEQ, DT_BF16, BUF_SHARED_HBM)
-C:     Tile3D = nl_ndarray_3d(BATCH, STATE, SEQ, DT_BF16, BUF_SHARED_HBM)
+B:     Tile3D = nl_ndarray_3d(BATCH, STATE, SEQ, DT_BF16, BUF_SHARED_HBM, PAR_D1)
+C:     Tile3D = nl_ndarray_3d(BATCH, STATE, SEQ, DT_BF16, BUF_SHARED_HBM, PAR_D1)
 
 out: Tile3D = mamba_v2(delta, u, A, B, C)
 

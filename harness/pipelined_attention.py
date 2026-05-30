@@ -13,9 +13,9 @@ B: int      = 1
 D: int      = 128
 SEQLEN: int = 2048
 
-q: Tile3D = nl_ndarray_3d(B, D, SEQLEN, DT_BF16, BUF_SHARED_HBM)
-k: Tile3D = nl_ndarray_3d(B, D, SEQLEN, DT_BF16, BUF_SHARED_HBM)
-v: Tile3D = nl_ndarray_3d(B, SEQLEN, D, DT_BF16, BUF_SHARED_HBM)
+q: Tile3D = nl_ndarray_3d(B, D, SEQLEN, DT_BF16, BUF_SHARED_HBM, PAR_D1)
+k: Tile3D = nl_ndarray_3d(B, D, SEQLEN, DT_BF16, BUF_SHARED_HBM, PAR_D1)
+v: Tile3D = nl_ndarray_3d(B, SEQLEN, D, DT_BF16, BUF_SHARED_HBM, PAR_D1)
 out: Tile3D = flash_fwd_shell(q, k, v)
 
 assert out.d0 == B

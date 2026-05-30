@@ -54,7 +54,7 @@ def flash_fwd_shell(q: Tile3D, k: Tile3D, v: Tile3D) -> Tile3D:
     assert k.d1 == d
     assert k.d2 == seqlen_k
 
-    o: Tile3D = nl_ndarray_3d(b, seqlen_q, d, q.dtype, BUF_SHARED_HBM)
+    o: Tile3D = nl_ndarray_3d(b, seqlen_q, d, q.dtype, BUF_SHARED_HBM, PAR_D1)
 
     sb_p: int       = 128
     num_grps: int   = seqlen_k // sb_p
@@ -110,7 +110,7 @@ def flash_fwd_load_q_only(q: Tile3D, k: Tile3D, v: Tile3D) -> Tile3D:
     assert k.d1 == d
     assert k.d2 == seqlen_k
 
-    o: Tile3D = nl_ndarray_3d(b, seqlen_q, d, q.dtype, BUF_SHARED_HBM)
+    o: Tile3D = nl_ndarray_3d(b, seqlen_q, d, q.dtype, BUF_SHARED_HBM, PAR_D1)
 
     sb_p: int       = 128
     num_grps: int   = seqlen_k // sb_p
@@ -121,7 +121,7 @@ def flash_fwd_load_q_only(q: Tile3D, k: Tile3D, v: Tile3D) -> Tile3D:
     for _section_i in nl_affine_range(num_sections):
         p: int = d
         n: int = sb_p
-        q_loaded: Tile3D = nl_ndarray_3d(num_grps, p, n, q.dtype, BUF_SBUF)
+        q_loaded: Tile3D = nl_ndarray_3d(num_grps, p, n, q.dtype, BUF_SBUF, PAR_D1)
         iq_p, iq_f = nl_mgrid_2d(0, p, 0, n)
 
         def load_q(grp_i: int) -> None:
@@ -174,7 +174,7 @@ def flash_fwd_qk_and_max_only(q: Tile3D, k: Tile3D, v: Tile3D) -> Tile3D:
     assert k.d1 == d
     assert k.d2 == seqlen_k
 
-    o: Tile3D = nl_ndarray_3d(b, seqlen_q, d, q.dtype, BUF_SHARED_HBM)
+    o: Tile3D = nl_ndarray_3d(b, seqlen_q, d, q.dtype, BUF_SHARED_HBM, PAR_D1)
 
     sb_p: int       = 128
     num_grps: int   = seqlen_k // sb_p
@@ -183,13 +183,13 @@ def flash_fwd_qk_and_max_only(q: Tile3D, k: Tile3D, v: Tile3D) -> Tile3D:
     num_512_tiles: int = seqlen_k // 512
     batch_id: int = 0
 
-    k_loaded: Tile3D = nl_ndarray_3d(num_512_tiles, 128, 512, k.dtype, BUF_SBUF)
+    k_loaded: Tile3D = nl_ndarray_3d(num_512_tiles, 128, 512, k.dtype, BUF_SBUF, PAR_D1)
 
     for _section_i in nl_affine_range(num_sections):
         p: int = d
         n: int = sb_p
         num_2048_tiles_cur_section: int = section_len // 2048
-        q_loaded: Tile3D = nl_ndarray_3d(num_grps, p, n, q.dtype, BUF_SBUF)
+        q_loaded: Tile3D = nl_ndarray_3d(num_grps, p, n, q.dtype, BUF_SBUF, PAR_D1)
         mm1_psum_dot: Tile5D = nl_ndarray_5d(
             128, num_grps, num_2048_tiles_cur_section, 4, 512,
             DT_F32, BUF_PSUM)
@@ -198,7 +198,7 @@ def flash_fwd_qk_and_max_only(q: Tile3D, k: Tile3D, v: Tile3D) -> Tile3D:
             DT_F32, BUF_SBUF)
         temp_reduce14_sbuf: Tile3D = nl_ndarray_3d(
             128, num_grps, num_2048_tiles_cur_section * 4,
-            DT_F32, BUF_SBUF)
+            DT_F32, BUF_SBUF, PAR_D0)
         iq_p, iq_f = nl_mgrid_2d(0, p, 0, n)
 
         def load_q(grp_i: int) -> None:
@@ -274,7 +274,7 @@ def flash_fwd_update_max_only(q: Tile3D, k: Tile3D, v: Tile3D) -> Tile3D:
     assert k.d1 == d
     assert k.d2 == seqlen_k
 
-    o: Tile3D = nl_ndarray_3d(b, seqlen_q, d, q.dtype, BUF_SHARED_HBM)
+    o: Tile3D = nl_ndarray_3d(b, seqlen_q, d, q.dtype, BUF_SHARED_HBM, PAR_D1)
 
     sb_p: int       = 128
     num_grps: int   = seqlen_k // sb_p
@@ -285,13 +285,13 @@ def flash_fwd_update_max_only(q: Tile3D, k: Tile3D, v: Tile3D) -> Tile3D:
 
     running_max: Tile = nl_ndarray_2d(sb_p, num_grps, DT_F32, BUF_SBUF)
     zero_bias_tensor: Tile = nl_ndarray_2d(128, 1, DT_F32, BUF_SBUF)
-    k_loaded: Tile3D = nl_ndarray_3d(num_512_tiles, 128, 512, k.dtype, BUF_SBUF)
+    k_loaded: Tile3D = nl_ndarray_3d(num_512_tiles, 128, 512, k.dtype, BUF_SBUF, PAR_D1)
 
     for section_i in nl_affine_range(num_sections):
         p: int = d
         n: int = sb_p
         num_2048_tiles_cur_section: int = section_len // 2048
-        q_loaded: Tile3D = nl_ndarray_3d(num_grps, p, n, q.dtype, BUF_SBUF)
+        q_loaded: Tile3D = nl_ndarray_3d(num_grps, p, n, q.dtype, BUF_SBUF, PAR_D1)
         mm1_psum_dot: Tile5D = nl_ndarray_5d(
             128, num_grps, num_2048_tiles_cur_section, 4, 512,
             DT_F32, BUF_PSUM)
@@ -300,13 +300,13 @@ def flash_fwd_update_max_only(q: Tile3D, k: Tile3D, v: Tile3D) -> Tile3D:
             DT_F32, BUF_SBUF)
         temp_reduce14_sbuf: Tile3D = nl_ndarray_3d(
             128, num_grps, num_2048_tiles_cur_section * 4,
-            DT_F32, BUF_SBUF)
+            DT_F32, BUF_SBUF, PAR_D0)
         final_reduce_max: Tile3D = nl_ndarray_3d(
-            128, num_grps, 1, DT_F32, BUF_SBUF)
+            128, num_grps, 1, DT_F32, BUF_SBUF, PAR_D0)
         prev_running_max: Tile3D = nl_ndarray_3d(
-            128, num_grps, 1, DT_F32, BUF_SBUF)
+            128, num_grps, 1, DT_F32, BUF_SBUF, PAR_D0)
         scaling_factor: Tile3D = nl_ndarray_3d(
-            128, num_grps, 1, DT_F32, BUF_SBUF)
+            128, num_grps, 1, DT_F32, BUF_SBUF, PAR_D0)
         iq_p, iq_f = nl_mgrid_2d(0, p, 0, n)
 
         def load_q(grp_i: int) -> None:
@@ -393,7 +393,7 @@ def flash_fwd_exp_only(q: Tile3D, k: Tile3D, v: Tile3D) -> Tile3D:
     assert k.d1 == d
     assert k.d2 == seqlen_k
 
-    o: Tile3D = nl_ndarray_3d(b, seqlen_q, d, q.dtype, BUF_SHARED_HBM)
+    o: Tile3D = nl_ndarray_3d(b, seqlen_q, d, q.dtype, BUF_SHARED_HBM, PAR_D1)
 
     sb_p: int       = 128
     num_grps: int   = seqlen_k // sb_p
@@ -406,13 +406,13 @@ def flash_fwd_exp_only(q: Tile3D, k: Tile3D, v: Tile3D) -> Tile3D:
 
     running_max: Tile = nl_ndarray_2d(sb_p, num_grps, DT_F32, BUF_SBUF)
     zero_bias_tensor: Tile = nl_ndarray_2d(128, 1, DT_F32, BUF_SBUF)
-    k_loaded: Tile3D = nl_ndarray_3d(num_512_tiles, 128, 512, k.dtype, BUF_SBUF)
+    k_loaded: Tile3D = nl_ndarray_3d(num_512_tiles, 128, 512, k.dtype, BUF_SBUF, PAR_D1)
 
     for section_i in nl_affine_range(num_sections):
         p: int = d
         n: int = sb_p
         num_2048_tiles_cur_section: int = section_len // 2048
-        q_loaded: Tile3D = nl_ndarray_3d(num_grps, p, n, q.dtype, BUF_SBUF)
+        q_loaded: Tile3D = nl_ndarray_3d(num_grps, p, n, q.dtype, BUF_SBUF, PAR_D1)
         mm1_psum_dot: Tile5D = nl_ndarray_5d(
             128, num_grps, num_2048_tiles_cur_section, 4, 512,
             DT_F32, BUF_PSUM)
@@ -421,19 +421,19 @@ def flash_fwd_exp_only(q: Tile3D, k: Tile3D, v: Tile3D) -> Tile3D:
             DT_F32, BUF_SBUF)
         temp_reduce14_sbuf: Tile3D = nl_ndarray_3d(
             128, num_grps, num_2048_tiles_cur_section * 4,
-            DT_F32, BUF_SBUF)
+            DT_F32, BUF_SBUF, PAR_D0)
         final_reduce_max: Tile3D = nl_ndarray_3d(
-            128, num_grps, 1, DT_F32, BUF_SBUF)
+            128, num_grps, 1, DT_F32, BUF_SBUF, PAR_D0)
         prev_running_max: Tile3D = nl_ndarray_3d(
-            128, num_grps, 1, DT_F32, BUF_SBUF)
+            128, num_grps, 1, DT_F32, BUF_SBUF, PAR_D0)
         scaling_factor: Tile3D = nl_ndarray_3d(
-            128, num_grps, 1, DT_F32, BUF_SBUF)
+            128, num_grps, 1, DT_F32, BUF_SBUF, PAR_D0)
         exp6_sbuf: Tile4D = nl_ndarray_4d(
             128, num_grps, num_2048_tiles_cur_section, 2048,
             DT_BF16, BUF_SBUF)
         final_reduce_sum_b: Tile3D = nl_ndarray_3d(
             128, num_grps, section_len // exp_inst_elems,
-            DT_F32, BUF_SBUF)
+            DT_F32, BUF_SBUF, PAR_D0)
         iq_p, iq_f = nl_mgrid_2d(0, p, 0, n)
 
         def load_q(grp_i: int) -> None:
@@ -552,7 +552,7 @@ def flash_fwd_tp_only(q: Tile3D, k: Tile3D, v: Tile3D) -> Tile3D:
     assert k.d1 == d
     assert k.d2 == seqlen_k
 
-    o: Tile3D = nl_ndarray_3d(b, seqlen_q, d, q.dtype, BUF_SHARED_HBM)
+    o: Tile3D = nl_ndarray_3d(b, seqlen_q, d, q.dtype, BUF_SHARED_HBM, PAR_D1)
 
     sb_p: int       = 128
     num_grps: int   = seqlen_k // sb_p
@@ -570,13 +570,13 @@ def flash_fwd_tp_only(q: Tile3D, k: Tile3D, v: Tile3D) -> Tile3D:
     running_max: Tile = nl_ndarray_2d(sb_p, num_grps, DT_F32, BUF_SBUF)
     zero_bias_tensor: Tile = nl_ndarray_2d(128, 1, DT_F32, BUF_SBUF)
     identity_load: Tile = nl_ndarray_2d(128, 128, DT_BF16, BUF_SBUF)
-    k_loaded: Tile3D = nl_ndarray_3d(num_512_tiles, 128, 512, k.dtype, BUF_SBUF)
+    k_loaded: Tile3D = nl_ndarray_3d(num_512_tiles, 128, 512, k.dtype, BUF_SBUF, PAR_D1)
 
     for section_i in nl_affine_range(num_sections):
         p: int = d
         n: int = sb_p
         num_2048_tiles_cur_section: int = section_len // 2048
-        q_loaded: Tile3D = nl_ndarray_3d(num_grps, p, n, q.dtype, BUF_SBUF)
+        q_loaded: Tile3D = nl_ndarray_3d(num_grps, p, n, q.dtype, BUF_SBUF, PAR_D1)
         mm1_psum_dot: Tile5D = nl_ndarray_5d(
             128, num_grps, num_2048_tiles_cur_section, 4, 512,
             DT_F32, BUF_PSUM)
@@ -585,19 +585,19 @@ def flash_fwd_tp_only(q: Tile3D, k: Tile3D, v: Tile3D) -> Tile3D:
             DT_F32, BUF_SBUF)
         temp_reduce14_sbuf: Tile3D = nl_ndarray_3d(
             128, num_grps, num_2048_tiles_cur_section * 4,
-            DT_F32, BUF_SBUF)
+            DT_F32, BUF_SBUF, PAR_D0)
         final_reduce_max: Tile3D = nl_ndarray_3d(
-            128, num_grps, 1, DT_F32, BUF_SBUF)
+            128, num_grps, 1, DT_F32, BUF_SBUF, PAR_D0)
         prev_running_max: Tile3D = nl_ndarray_3d(
-            128, num_grps, 1, DT_F32, BUF_SBUF)
+            128, num_grps, 1, DT_F32, BUF_SBUF, PAR_D0)
         scaling_factor: Tile3D = nl_ndarray_3d(
-            128, num_grps, 1, DT_F32, BUF_SBUF)
+            128, num_grps, 1, DT_F32, BUF_SBUF, PAR_D0)
         exp6_sbuf: Tile4D = nl_ndarray_4d(
             128, num_grps, num_2048_tiles_cur_section, 2048,
             DT_BF16, BUF_SBUF)
         final_reduce_sum_b: Tile3D = nl_ndarray_3d(
             128, num_grps, section_len // exp_inst_elems,
-            DT_F32, BUF_SBUF)
+            DT_F32, BUF_SBUF, PAR_D0)
         tp_psum: Tile5D = nl_ndarray_5d(
             128, num_grps, num_2048_tiles_cur_section, num_tp_grps, n_per_part,
             DT_F32, BUF_PSUM)
@@ -744,7 +744,7 @@ def flash_fwd_pv_only(q: Tile3D, k: Tile3D, v: Tile3D) -> Tile3D:
     assert k.d1 == d
     assert k.d2 == seqlen_k
 
-    o: Tile3D = nl_ndarray_3d(b, seqlen_q, d, q.dtype, BUF_SHARED_HBM)
+    o: Tile3D = nl_ndarray_3d(b, seqlen_q, d, q.dtype, BUF_SHARED_HBM, PAR_D1)
 
     sb_p: int       = 128
     num_grps: int   = seqlen_k // sb_p
@@ -764,7 +764,7 @@ def flash_fwd_pv_only(q: Tile3D, k: Tile3D, v: Tile3D) -> Tile3D:
     running_max: Tile = nl_ndarray_2d(sb_p, num_grps, DT_F32, BUF_SBUF)
     zero_bias_tensor: Tile = nl_ndarray_2d(128, 1, DT_F32, BUF_SBUF)
     identity_load: Tile = nl_ndarray_2d(128, 128, DT_BF16, BUF_SBUF)
-    k_loaded: Tile3D = nl_ndarray_3d(num_512_tiles, 128, 512, k.dtype, BUF_SBUF)
+    k_loaded: Tile3D = nl_ndarray_3d(num_512_tiles, 128, 512, k.dtype, BUF_SBUF, PAR_D1)
 
     for section_i in nl_affine_range(num_sections):
         p: int = d
@@ -772,8 +772,8 @@ def flash_fwd_pv_only(q: Tile3D, k: Tile3D, v: Tile3D) -> Tile3D:
         num_2048_tiles_cur_section: int = section_len // 2048
         num_128_tiles_cur_section: int = section_len // 128
         v_loaded: Tile3D = nl_ndarray_3d(
-            num_128_tiles_cur_section, p, n, DT_BF16, BUF_SBUF)
-        q_loaded: Tile3D = nl_ndarray_3d(num_grps, p, n, q.dtype, BUF_SBUF)
+            num_128_tiles_cur_section, p, n, DT_BF16, BUF_SBUF, PAR_D1)
+        q_loaded: Tile3D = nl_ndarray_3d(num_grps, p, n, q.dtype, BUF_SBUF, PAR_D1)
         mm1_psum_dot: Tile5D = nl_ndarray_5d(
             128, num_grps, num_2048_tiles_cur_section, 4, 512,
             DT_F32, BUF_PSUM)
@@ -782,19 +782,19 @@ def flash_fwd_pv_only(q: Tile3D, k: Tile3D, v: Tile3D) -> Tile3D:
             DT_F32, BUF_SBUF)
         temp_reduce14_sbuf: Tile3D = nl_ndarray_3d(
             128, num_grps, num_2048_tiles_cur_section * 4,
-            DT_F32, BUF_SBUF)
+            DT_F32, BUF_SBUF, PAR_D0)
         final_reduce_max: Tile3D = nl_ndarray_3d(
-            128, num_grps, 1, DT_F32, BUF_SBUF)
+            128, num_grps, 1, DT_F32, BUF_SBUF, PAR_D0)
         prev_running_max: Tile3D = nl_ndarray_3d(
-            128, num_grps, 1, DT_F32, BUF_SBUF)
+            128, num_grps, 1, DT_F32, BUF_SBUF, PAR_D0)
         scaling_factor: Tile3D = nl_ndarray_3d(
-            128, num_grps, 1, DT_F32, BUF_SBUF)
+            128, num_grps, 1, DT_F32, BUF_SBUF, PAR_D0)
         exp6_sbuf: Tile4D = nl_ndarray_4d(
             128, num_grps, num_2048_tiles_cur_section, 2048,
             DT_BF16, BUF_SBUF)
         final_reduce_sum_b: Tile3D = nl_ndarray_3d(
             128, num_grps, section_len // exp_inst_elems,
-            DT_F32, BUF_SBUF)
+            DT_F32, BUF_SBUF, PAR_D0)
         tp_psum: Tile5D = nl_ndarray_5d(
             128, num_grps, num_2048_tiles_cur_section, num_tp_grps, n_per_part,
             DT_F32, BUF_PSUM)
@@ -805,7 +805,7 @@ def flash_fwd_pv_only(q: Tile3D, k: Tile3D, v: Tile3D) -> Tile3D:
             mm2_p, num_grps, num_2048_tiles_cur_section, mm2_n,
             DT_F32, BUF_PSUM)
         mm2_sbuf: Tile3D = nl_ndarray_3d(
-            mm2_p, num_grps, mm2_n, DT_F32, BUF_SBUF)
+            mm2_p, num_grps, mm2_n, DT_F32, BUF_SBUF, PAR_D0)
         iq_p, iq_f = nl_mgrid_2d(0, p, 0, n)
 
         def load_q(grp_i: int) -> None:
@@ -977,7 +977,7 @@ def flash_fwd_full(q: Tile3D, k: Tile3D, v: Tile3D) -> Tile3D:
     assert k.d1 == d
     assert k.d2 == seqlen_k
 
-    o: Tile3D = nl_ndarray_3d(b, seqlen_q, d, q.dtype, BUF_SHARED_HBM)
+    o: Tile3D = nl_ndarray_3d(b, seqlen_q, d, q.dtype, BUF_SHARED_HBM, PAR_D1)
 
     sb_p: int       = 128
     num_grps: int   = seqlen_k // sb_p
@@ -999,7 +999,7 @@ def flash_fwd_full(q: Tile3D, k: Tile3D, v: Tile3D) -> Tile3D:
     div_25_sbuf: Tile = nl_ndarray_2d(128, num_grps, DT_F32, BUF_SBUF)
     zero_bias_tensor: Tile = nl_ndarray_2d(128, 1, DT_F32, BUF_SBUF)
     identity_load: Tile = nl_ndarray_2d(128, 128, DT_BF16, BUF_SBUF)
-    k_loaded: Tile3D = nl_ndarray_3d(num_512_tiles, 128, 512, k.dtype, BUF_SBUF)
+    k_loaded: Tile3D = nl_ndarray_3d(num_512_tiles, 128, 512, k.dtype, BUF_SBUF, PAR_D1)
 
     for section_i in nl_affine_range(num_sections):
         p: int = d
@@ -1007,8 +1007,8 @@ def flash_fwd_full(q: Tile3D, k: Tile3D, v: Tile3D) -> Tile3D:
         num_2048_tiles_cur_section: int = section_len // 2048
         num_128_tiles_cur_section: int = section_len // 128
         v_loaded: Tile3D = nl_ndarray_3d(
-            num_128_tiles_cur_section, p, n, DT_BF16, BUF_SBUF)
-        q_loaded: Tile3D = nl_ndarray_3d(num_grps, p, n, q.dtype, BUF_SBUF)
+            num_128_tiles_cur_section, p, n, DT_BF16, BUF_SBUF, PAR_D1)
+        q_loaded: Tile3D = nl_ndarray_3d(num_grps, p, n, q.dtype, BUF_SBUF, PAR_D1)
         mm1_psum_dot: Tile5D = nl_ndarray_5d(
             128, num_grps, num_2048_tiles_cur_section, 4, 512,
             DT_F32, BUF_PSUM)
@@ -1017,19 +1017,19 @@ def flash_fwd_full(q: Tile3D, k: Tile3D, v: Tile3D) -> Tile3D:
             DT_F32, BUF_SBUF)
         temp_reduce14_sbuf: Tile3D = nl_ndarray_3d(
             128, num_grps, num_2048_tiles_cur_section * 4,
-            DT_F32, BUF_SBUF)
+            DT_F32, BUF_SBUF, PAR_D0)
         final_reduce_max: Tile3D = nl_ndarray_3d(
-            128, num_grps, 1, DT_F32, BUF_SBUF)
+            128, num_grps, 1, DT_F32, BUF_SBUF, PAR_D0)
         prev_running_max: Tile3D = nl_ndarray_3d(
-            128, num_grps, 1, DT_F32, BUF_SBUF)
+            128, num_grps, 1, DT_F32, BUF_SBUF, PAR_D0)
         scaling_factor: Tile3D = nl_ndarray_3d(
-            128, num_grps, 1, DT_F32, BUF_SBUF)
+            128, num_grps, 1, DT_F32, BUF_SBUF, PAR_D0)
         exp6_sbuf: Tile4D = nl_ndarray_4d(
             128, num_grps, num_2048_tiles_cur_section, 2048,
             DT_BF16, BUF_SBUF)
         final_reduce_sum_b: Tile3D = nl_ndarray_3d(
             128, num_grps, section_len // exp_inst_elems,
-            DT_F32, BUF_SBUF)
+            DT_F32, BUF_SBUF, PAR_D0)
         tp_psum: Tile5D = nl_ndarray_5d(
             128, num_grps, num_2048_tiles_cur_section, num_tp_grps, n_per_part,
             DT_F32, BUF_PSUM)
@@ -1040,17 +1040,17 @@ def flash_fwd_full(q: Tile3D, k: Tile3D, v: Tile3D) -> Tile3D:
             mm2_p, num_grps, num_2048_tiles_cur_section, mm2_n,
             DT_F32, BUF_PSUM)
         mm2_sbuf: Tile3D = nl_ndarray_3d(
-            mm2_p, num_grps, mm2_n, DT_F32, BUF_SBUF)
+            mm2_p, num_grps, mm2_n, DT_F32, BUF_SBUF, PAR_D0)
         final_reduce_sum_b_collect: Tile3D = nl_ndarray_3d(
-            128, num_grps, 1, DT_F32, BUF_SBUF)
+            128, num_grps, 1, DT_F32, BUF_SBUF, PAR_D0)
         prev_running_sum: Tile3D = nl_ndarray_3d(
-            128, num_grps, 1, DT_F32, BUF_SBUF)
+            128, num_grps, 1, DT_F32, BUF_SBUF, PAR_D0)
         prev_output: Tile3D = nl_ndarray_3d(
-            128, num_grps, 128, q.dtype, BUF_SBUF)
+            128, num_grps, 128, q.dtype, BUF_SBUF, PAR_D0)
         mm2_sbuf_res: Tile3D = nl_ndarray_3d(
-            128, num_grps, 128, q.dtype, BUF_SBUF)
+            128, num_grps, 128, q.dtype, BUF_SBUF, PAR_D0)
         mm2_div_sbuf: Tile3D = nl_ndarray_3d(
-            128, num_grps, 128, q.dtype, BUF_SBUF)
+            128, num_grps, 128, q.dtype, BUF_SBUF, PAR_D0)
         iq_p, iq_f = nl_mgrid_2d(0, p, 0, n)
 
         def load_q(grp_i: int) -> None:

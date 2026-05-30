@@ -11,7 +11,7 @@ H_SRC: int = 20
 W_SRC: int = 20
 CHUNK: int = 10
 
-src: Tile3D = nl_ndarray_3d(NC, H_SRC, W_SRC, DT_F32, BUF_HBM)
+src: Tile3D = nl_ndarray_3d(NC, H_SRC, W_SRC, DT_F32, BUF_HBM, PAR_D0)
 dst: Tile3D = interpolate_bilinear_2x_fwd(src, CHUNK)
 
 assert dst.d0 == NC

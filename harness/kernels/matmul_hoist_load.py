@@ -28,14 +28,14 @@ def nki_matmul_hoist_load(lhsT: Tile, rhs: Tile) -> Tile:
 
     for m in nl_affine_range(M // TILE_M):
         lhsT_tiles: Tile3D = nl_ndarray_3d(K_TILES, TILE_K, TILE_M,
-                                           lhsT.dtype, BUF_SBUF)
+                                           lhsT.dtype, BUF_SBUF, PAR_D1)
         for k in nl_affine_range(K_TILES):
             lhsT_tiles[k, :, :] = nl_load_2d(lhsT, k*TILE_K, (k+1)*TILE_K,
                                                    m*TILE_M, (m+1)*TILE_M)
 
         for n in nl_affine_range(N // TILE_N):
             rhs_tiles: Tile3D = nl_ndarray_3d(K_TILES, TILE_K, TILE_N,
-                                              rhs.dtype, BUF_SBUF)
+                                              rhs.dtype, BUF_SBUF, PAR_D1)
             for k in nl_affine_range(K_TILES):
                 rhs_tiles[k, :, :] = nl_load_2d(rhs, k*TILE_K, (k+1)*TILE_K,
                                                      n*TILE_N, (n+1)*TILE_N)

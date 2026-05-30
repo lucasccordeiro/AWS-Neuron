@@ -32,7 +32,7 @@ def nki_matmul_block_free(lhsT: Tile, rhs: Tile) -> Tile:
     for m in nl_affine_range(M // BLOCK_M):
         lhsT_tiles: Tile3D = nl_ndarray_3d(TILES_IN_BLOCK_M * K_TILES,
                                            TILE_K, TILE_M,
-                                           lhsT.dtype, BUF_SBUF)
+                                           lhsT.dtype, BUF_SBUF, PAR_D1)
         for bm in nl_affine_range(TILES_IN_BLOCK_M):
             for k in nl_affine_range(K_TILES):
                 m_idx: int = m * TILES_IN_BLOCK_M + bm
@@ -44,7 +44,7 @@ def nki_matmul_block_free(lhsT: Tile, rhs: Tile) -> Tile:
         for n in nl_affine_range(N // BLOCK_N):
             rhs_tiles: Tile3D = nl_ndarray_3d(TILES_IN_BLOCK_N * K_TILES,
                                               TILE_K, TILE_N,
-                                              rhs.dtype, BUF_SBUF)
+                                              rhs.dtype, BUF_SBUF, PAR_D1)
             for bn in nl_affine_range(TILES_IN_BLOCK_N):
                 for k in nl_affine_range(K_TILES):
                     n_idx: int = n * TILES_IN_BLOCK_N + bn

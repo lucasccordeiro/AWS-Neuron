@@ -58,7 +58,7 @@ def attn_fwd_v3(q: Tile, k: Tile, v: Tile) -> Tile:
             row_max[:, i_tile_q:i_tile_q + 1], row_max_kv)
 
     norm_row: Tile3D = nl_ndarray_3d(seqlen_q // PMAX, PMAX, seqlen_kv,
-                                     DT_F32, BUF_SHARED_HBM)
+                                     DT_F32, BUF_SHARED_HBM, PAR_D1)
     for i_tile_q in nl_affine_range(seqlen_q // PMAX):
         norm_buf: Tile = nl_ndarray_2d(PMAX, seqlen_kv, DT_F32, BUF_SBUF)
         for i_tile_kv in nl_affine_range(seqlen_kv // fmax_moving):
@@ -71,7 +71,7 @@ def attn_fwd_v3(q: Tile, k: Tile, v: Tile) -> Tile:
         nl_store_3d_slot(norm_row, i_tile_q, norm_buf)
 
     exp_row: Tile3D = nl_ndarray_3d(seqlen_q // PMAX, PMAX, seqlen_kv,
-                                    DT_F32, BUF_SHARED_HBM)
+                                    DT_F32, BUF_SHARED_HBM, PAR_D1)
     for i_tile_q in nl_affine_range(seqlen_q // PMAX):
         exp_buf: Tile = nl_ndarray_2d(PMAX, seqlen_kv, DT_F32, BUF_SBUF)
         norm_buf_loaded: Tile = nl_load_3d_slot(norm_row, i_tile_q)
@@ -89,7 +89,7 @@ def attn_fwd_v3(q: Tile, k: Tile, v: Tile) -> Tile:
     nisa_reciprocal_2d(inverse_sum_row, sum_row)
 
     scores: Tile3D = nl_ndarray_3d(seqlen_q // PMAX, PMAX, seqlen_kv,
-                                   DT_F32, BUF_SHARED_HBM)
+                                   DT_F32, BUF_SHARED_HBM, PAR_D1)
     for i_tile_q in nl_affine_range(seqlen_q // PMAX):
         scores_buf: Tile = nl_ndarray_2d(PMAX, seqlen_kv, DT_F32, BUF_SBUF)
         exp_buf_loaded2: Tile = nl_load_3d_slot(exp_row, i_tile_q)
@@ -99,7 +99,7 @@ def attn_fwd_v3(q: Tile, k: Tile, v: Tile) -> Tile:
         nl_store_3d_slot(scores, i_tile_q, scores_buf)
 
     v_t: Tile3D = nl_ndarray_3d(seqlen_kv // PMAX, PMAX, d_head,
-                                DT_F32, BUF_SHARED_HBM)
+                                DT_F32, BUF_SHARED_HBM, PAR_D1)
     for i_tile_kv in nl_affine_range(seqlen_kv // PMAX):
         v_psum_t: Tile = nl_ndarray_2d(PMAX, d_head, v_sbuf.dtype, BUF_PSUM)
         nisa_nc_transpose(v_psum_t,
