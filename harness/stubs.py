@@ -15,9 +15,10 @@
 # 3-D tiles come in two conventions, so the partition axis is carried
 # explicitly on Tile3D and declared at every nl_ndarray_3d call site
 # (AUDIT Finding 11):
-#   PAR_D0 — par_dim is d0 (avgpool, interpolate, pipelined_attention).
+#   PAR_D0 — par_dim is d0 (avgpool, interpolate, maxpooling, and the
+#            par-hoisted reduction tiles of pipelined_attention).
 #   PAR_D1 — (slabs=d0, par_dim=d1, free=d2): matmul family, attn_fwd_v3,
-#            fused_mamba.
+#            fused_mamba, and pipelined_attention's slab tiles.
 # Tile4D / Tile5D are always par=d0 by construction.
 # Defined before the Tile classes so the class methods can reference them
 # (ESBMC's Python frontend resolves a global only if it precedes the use).
@@ -457,8 +458,12 @@ def nl_load_fancy_2d_to_3d(src: Tile,
     assert out_d0 > 0
     assert out_d1 > 0
     assert out_d2 > 0
-    assert out_d1 <= PMAX
-    return Tile3D(out_d0, out_d1, out_d2, dtype, BUF_SBUF, PAR_D1)
+    # The loaded SBUF tile's partition axis is d0 — the masked base/par axis
+    # (e.g. maxpooling's i_h, tiled to PMAX). d1 is the row-offset axis and
+    # d2 the column axis, both free. (Pre-#26 this checked out_d1, the wrong
+    # axis; the gap was inert because the only consumer is par-axis-agnostic.)
+    assert out_d0 <= PMAX
+    return Tile3D(out_d0, out_d1, out_d2, dtype, BUF_SBUF, PAR_D0)
 
 # Masked 2-D fancy store from a 2-D SBUF tile back into a 2-D HBM tensor.
 #   nl.store(dst[row_idx, col_idx], value=tile, mask=(row_idx < mask_max_row))
@@ -656,6 +661,7 @@ def tile_fancy_access_3d(t: Tile3D,
                          p_idx: IndexTensor,
                          h_idx: IndexTensor,
                          w_idx: IndexTensor) -> None:
+    assert t.par_axis == PAR_D0
     p: int = nondet_int()
     h: int = nondet_int()
     w: int = nondet_int()
