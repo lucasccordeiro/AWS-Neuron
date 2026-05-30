@@ -46,12 +46,15 @@ added during the `fully_optimized` port; two existing stubs relaxed
 +2 build targets. Total: 37. The `.ap()` contract is shape-and-bounds:
 each axis is a (stride, count) pair, and the maximum reachable flat
 offset `sum_k stride_k * (count_k - 1)` must be strictly less than the
-source's element count. The view's partition-axis count is also
-limited to PMAX when the source lives in SBUF/PSUM. The contract does
-*not* verify that the strides correspond to a meaningful reshape —
-only that every element accessed via the view is inside the source's
-allocation. Sound for catching stride/count off-by-ones and overflow;
-silent on transpositions that happen to preserve total volume.
+source's element count. When the source lives in SBUF/PSUM the view's
+partition-axis count is limited to PMAX and (AUDIT Finding 11,
+Increment 2) its axis-0 stride must walk whole partition slabs
+(`s0 == d1*d2`) so the view cannot cross partition boundaries. Beyond
+that axis-0 alignment the contract does *not* verify that the remaining
+strides correspond to a meaningful reshape — only that every element
+accessed via the view is inside the source's allocation. Sound for
+catching stride/count off-by-ones, overflow, and partition-crossing;
+still silent on free-axis transpositions that preserve total volume.
 
 ## Tier 3 — new primitive family
 
