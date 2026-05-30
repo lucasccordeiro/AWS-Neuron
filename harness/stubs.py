@@ -20,8 +20,12 @@
 #   PAR_D1 — (slabs=d0, par_dim=d1, free=d2): matmul family, attn_fwd_v3,
 #            fused_mamba, and pipelined_attention's slab tiles.
 # Tile4D / Tile5D are always par=d0 by construction.
-# Defined before the Tile classes so the class methods can reference them
-# (ESBMC's Python frontend resolves a global only if it precedes the use).
+# Defined before the Tile classes as a workaround for esbmc/esbmc#4970:
+# when a class is star-imported (`from stubs import *`) and a method
+# references a module global defined textually after the class, ESBMC's
+# Python frontend fails name resolution ("Variable ... is not defined").
+# Hoisting these constants above the classes sidesteps it. (The single-file
+# case resolves fine; the trigger is specifically the cross-module import.)
 
 PAR_D0: int = 0
 PAR_D1: int = 1
