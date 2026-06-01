@@ -421,6 +421,27 @@ def nisa_nc_matmul_mx(dst: Tile, stationary: Tile, moving: Tile,
     assert dst.d1 == moving.d1
     assert dst.buffer == BUF_PSUM
 
+# nisa.quantize_mx(dst, src, dst_scale): quantize an unquantized (P, F) tile
+# into an _x4-packed (P, F//4) tile, emitting a uint8 scale per
+# (8 partition x 4 free) scaling group. Contracts: the free-dim packs 4->1
+# (dst.d1 == src.d1 // 4, and src.d1 divisible by 4); the partition extent is
+# preserved (dst.d0 == src.d0); the scale free-dim is the input free-dim // 4
+# (dst_scale.d1 == src.d1 // 4); and the scale partition extent is either the
+# single-quadrant P//8 or the spread-across-quadrants P, per allocate_mx_tiles.
+#
+# The scale-partition check is the *permissive* disjunction below: upstream
+# makes it a strict function of P (P//8 iff P <= 32, else P), but encoding that
+# strictly needs a P-dependent branch, and the current suite only quantizes
+# P = 128 (so only the `== src.d0` arm is ever taken). Increment 3's
+# copy_data_strided introduces P = 32 tiles; the strict form lands there with a
+# test that exercises the P <= 32 arm.
+def nisa_quantize_mx(dst: Tile, src: Tile, dst_scale: Tile) -> None:
+    assert src.d1 % 4 == 0
+    assert dst.d0 == src.d0
+    assert dst.d1 == src.d1 // 4
+    assert dst_scale.d1 == src.d1 // 4
+    assert dst_scale.d0 == src.d0 or dst_scale.d0 == src.d0 // 8
+
 # ============================================================== Accumulation / reduction
 
 # Z_PSUM += other — shapes must match; destination must live in PSUM.

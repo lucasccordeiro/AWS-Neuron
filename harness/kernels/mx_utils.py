@@ -41,3 +41,22 @@ def load_scales_scattered(data_sbuf: Tile, scale_hbm: Tile,
     scale_sbuf = nl_ndarray_2d(scale_p, scale_f, scale_hbm.dtype, BUF_SBUF)
     nisa_dma_copy(scale_sbuf, scale_hbm)
     return scale_sbuf
+
+
+# Allocate the SBUF tiles produced by Quantize-MX for an unquantized (P, F)
+# input. The data tile's free-dim shrinks 4x (4 elements pack into 1). The
+# scale tile is (P//8, F//4) when P fits one quadrant (P <= 32), else oversized
+# to (P, F//4) so scales spread across partition quadrants. `alloc_scale=False`
+# skips the scale tile (the packed-scale kernel supplies its own).
+def allocate_mx_tiles(p: int, f: int, mx_dtype: int, alloc_scale: bool):
+    assert f % 4 == 0
+    mx_data_sbuf: Tile = nl_ndarray_2d(p, f // 4, mx_dtype, BUF_SBUF)
+
+    if not alloc_scale:
+        return mx_data_sbuf, None
+
+    if p <= 32:
+        mx_scale_sbuf: Tile = nl_ndarray_2d(p // 8, f // 4, DT_U8, BUF_SBUF)
+    else:
+        mx_scale_sbuf = nl_ndarray_2d(p, f // 4, DT_U8, BUF_SBUF)
+    return mx_data_sbuf, mx_scale_sbuf
