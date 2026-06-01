@@ -78,8 +78,10 @@ assumes familiarity with the verifier but not with NKI.
   (`--overflow-check --multi-property`): ESBMC enumerates both
   floor-div sites in a single run. Framed as a defensive-programming
   follow-on and filed as
-  [aws-neuron/nki-samples#127](https://github.com/aws-neuron/nki-samples/issues/127)
-  (OPEN), a separate ticket modelled on #125.
+  [aws-neuron/nki-samples#127](https://github.com/aws-neuron/nki-samples/issues/127),
+  a separate ticket modelled on #125; closed by upstream commit
+  [`bb513ac`](https://github.com/aws-neuron/nki-samples/commit/bb513ac88b716ef134eb5c92eec7c9e600c8f337),
+  which adopted the proposed `assert pool_size >= 1` precondition verbatim.
 - **One novel verification pattern** (nondet representative elements for
   fancy-index bound checks) which generalised across maxpooling, both
   interpolate variants, and is reusable for any mgrid-style code.

@@ -658,25 +658,31 @@ Witness: `pool_size = 0` reaches both sites.
 Filed (2026-05-29) as
 [aws-neuron/nki-samples#127](https://github.com/aws-neuron/nki-samples/issues/127)
 — *`tensor_avgpool_kernel`: `ZeroDivisionError` at trace time when
-`pool_size == 0`* — **OPEN** as of this writing. A **separate follow-on
-ticket**, modelled on the
+`pool_size == 0`* — and **fixed upstream the same day** by commit
+[`bb513ac`](https://github.com/aws-neuron/nki-samples/commit/bb513ac88b716ef134eb5c92eec7c9e600c8f337)
+(*"[#127] Check the pool_size is nonzero in tensor_avgpool_kernel"*),
+which adds the precondition `assert pool_size >= 1, "pool_size must be
+>= 1"` at the top of the kernel body — the first of the two remedies the
+filing proposed, verbatim. This mirrors the
 [#125](https://github.com/aws-neuron/nki-samples/issues/125) →
 [#126](https://github.com/aws-neuron/nki-samples/pull/126) precedent:
-#126 landed only on the interpolate kernels and left
-`tutorials/average_pool2d/tensor_avgpool_kernel` untouched. The kernel is
-byte-identical between the NKI 0.3.0 / Neuron SDK 2.29 release commit
-`a87aaa44` and current `main` HEAD `0dd1b48`, confirming the gap is live.
-The filing is framed explicitly as defensive-programming, *not* as a
-security-relevant finding — the trigger value `pool_size = 0` is
-unambiguously invalid and no realistic workflow would supply it. The ask
-is one of:
-- explicit `assert pool_size >= 1`
+a **separate follow-on ticket** was needed because #126 had landed only
+on the interpolate kernels and left
+`tutorials/average_pool2d/tensor_avgpool_kernel` untouched (the kernel
+was byte-identical between the NKI 0.3.0 / Neuron SDK 2.29 release commit
+`a87aaa44` and the then-current `main` HEAD `0dd1b48`, confirming the gap
+was live). The filing was framed explicitly as defensive-programming,
+*not* as a security-relevant finding — the trigger value `pool_size = 0`
+is unambiguously invalid and no realistic workflow would supply it. The
+ask was one of:
+- explicit `assert pool_size >= 1` ← **adopted upstream**
 - type annotation `pool_size: int` with a documented `>= 1`
   precondition
 
 The standalone `avgpool_hostarith_unguarded` phase-2 target is the
-regression that pins this finding: if #127 is closed upstream with either
-precondition, the reproducer remains a faithful regression on the fix.
+regression that pins this finding: now that #127 is closed upstream with
+the `assert pool_size >= 1` precondition, the reproducer remains a
+faithful regression on the fix.
 
 ### What this PoC target actually proves
 
@@ -695,7 +701,10 @@ Three things, in decreasing order of how much they matter:
    exercise. ESBMC enumerates both `sz_hout` and `sz_wout` floor-divs
    in one run. Without `--multi-property` only the first would
    surface and the second would be silently uncovered.
-3. **One more low-severity gap upstream.** The kernel's input
-   validation could be tighter — filed as
-   [#127](https://github.com/aws-neuron/nki-samples/issues/127). Not a
-   security finding; a defensive-programming follow-up.
+3. **One more low-severity gap closed upstream.** The kernel's input
+   validation was tightened — filed as
+   [#127](https://github.com/aws-neuron/nki-samples/issues/127) and
+   fixed by commit
+   [`bb513ac`](https://github.com/aws-neuron/nki-samples/commit/bb513ac88b716ef134eb5c92eec7c9e600c8f337)
+   (`assert pool_size >= 1`). Not a security finding; a
+   defensive-programming follow-up that upstream accepted verbatim.
