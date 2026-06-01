@@ -179,6 +179,15 @@ DT_I8: int   = 8
 DT_BF16: int = 10
 DT_F16: int  = 11
 DT_F32: int  = 12
+DT_U8: int   = 13   # uint8 — MX scale factors
+DT_U32: int  = 14   # uint32 — packed container for offline-quantized MX data
+
+# MXFP packed dtypes (_x4): four sub-elements packed per element. Opaque
+# tags — only identity / inequality enters the verifier (e.g. the FP4
+# reject in Quantize-MX). Distinct values so `!= DT_MX_F4E2M1_X4` discriminates.
+DT_MX_F8E5M2_X4: int = 20
+DT_MX_F8E4M3_X4: int = 21
+DT_MX_F4E2M1_X4: int = 22
 
 # ============================================================== Hardware constants
 # Sourced from NKI ISA documentation; held centrally so kernels never
@@ -350,6 +359,66 @@ def nisa_nc_matmul(dst: Tile, a: Tile, b: Tile) -> None:
     assert b.d1 <= GEMM_MOVING_FMAX
     assert dst.d0 == a.d1
     assert dst.d1 == b.d1
+    assert dst.buffer == BUF_PSUM
+
+# ============================================================== MXFP matmul
+# Microscaled-FP (MX) matmul support for tutorials/mxfp-matmul. Data tiles
+# are _x4-packed; per-(8 partition x 4 free) scaling groups carry a uint8
+# scale factor. The verification content here is shape-and-bounds: the
+# partition-quadrant scale layout and the dtype-reinterpreting access
+# pattern, NOT the quantization arithmetic (dtypes stay opaque tags).
+
+# tensor.ap(dtype=, pattern=[[s0,c0],[s1,c1]], offset=) — a dtype-
+# reinterpreting linear view over an HBM tensor. The MX kernels view a
+# uint-packed HBM tile as the corresponding _x4 dtype (element widths
+# coincide, so element count is preserved). The bound is the same flat-offset
+# envelope as the on-chip .ap(): the maximum reachable offset must stay inside
+# the source's element count. HBM-only: unlike tile3d_ap_5d this omits the
+# partition-major alignment guard (s0 == row-stride), which is sound because
+# HBM has no partition discipline. A caller reusing this on an SBUF/PSUM
+# source must add that guard (see tile3d_ap_5d, AUDIT Finding 11). Returns a
+# 2-D view tile carrying the new dtype.
+def hbm_ap_2d(src: Tile, s0: int, c0: int, s1: int, c1: int,
+              offset: int, dtype: int) -> Tile:
+    assert c0 > 0
+    assert c1 > 0
+    assert s0 >= 0
+    assert s1 >= 0
+    assert offset >= 0
+    max_offset: int = offset + s0 * (c0 - 1) + s1 * (c1 - 1)
+    assert max_offset < src.d0 * src.d1
+    return Tile(c0, c1, dtype, src.buffer)
+
+# One quadrant-scatter DMA in load_scales_scattered: writes `n_rows` scale
+# rows to destination partition rows [lo, lo + n_rows). nc_matmul_mx's SBUF
+# input layout requires each 4-row scale block to land in its partition-dim
+# quadrant; the block must stay inside the destination tile's partition
+# extent and the PMAX limit. This is the partition-overrun surface a wrong
+# quadrant stride trips (the buggy variant uses stride 64 instead of 32).
+def mx_scatter_quadrant(dst: Tile, lo: int, n_rows: int, scale_f: int) -> None:
+    assert n_rows >= 1
+    assert scale_f >= 1
+    assert lo >= 0
+    hi: int = lo + n_rows
+    assert hi <= dst.d0
+    assert hi <= PMAX
+    assert scale_f <= dst.d1
+
+# nisa.nc_matmul_mx(dst, stationary, moving, stationary_scale, moving_scale):
+# MX matmul. Data tiles contract on the partition axis d0 (<= PMAX); the
+# free dims obey the standard TensorE stationary/moving fmax limits. Each
+# scale tile is spread across the same partition extent as its data tile
+# (load_scales_scattered / quantize_mx guarantee this). Shape-only on dtype.
+def nisa_nc_matmul_mx(dst: Tile, stationary: Tile, moving: Tile,
+                      stationary_scale: Tile, moving_scale: Tile) -> None:
+    assert stationary.d0 == moving.d0
+    assert stationary.d0 <= PMAX
+    assert stationary.d1 <= GEMM_STATIONARY_FMAX
+    assert moving.d1 <= GEMM_MOVING_FMAX
+    assert stationary_scale.d0 == stationary.d0
+    assert moving_scale.d0 == moving.d0
+    assert dst.d0 == stationary.d1
+    assert dst.d1 == moving.d1
     assert dst.buffer == BUF_PSUM
 
 # ============================================================== Accumulation / reduction
