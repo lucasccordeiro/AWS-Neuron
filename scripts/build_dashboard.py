@@ -313,7 +313,7 @@ def render_html(manifest, issues: list[IssueRow],
       <div class="stat"><div class="v">{total_targets}/{total_targets}</div><div class="l">targets verified</div></div>
       <div class="stat"><div class="v">{n_functions}</div><div class="l">NKI kernel functions</div></div>
       <div class="stat"><div class="v">{n_kernel_files}</div><div class="l">families ({n_tutorial} tutorial / {n_contributed} contributed)</div></div>
-      <div class="stat"><div class="v">2</div><div class="l">real upstream bugs caught<br><span class="small">aws-neuron/nki-samples#74 · #125 (PR #126) · #127 defensive follow-on</span></div></div>
+      <div class="stat"><div class="v">2</div><div class="l">real upstream bugs caught<br><span class="small">aws-neuron/nki-samples#74 · #125 (PR #126) · #127 (commit bb513ac)</span></div></div>
       <div class="stat"><div class="v">{len(issues)}</div><div class="l">ESBMC issues filed<br><span class="small">{resolved_issues} resolved · {open_issues} open</span></div></div>
     </div>
     """

@@ -55,9 +55,12 @@ proposed in the AUDIT-15 write-up verbatim.
 A second, lower-severity host-arithmetic gap of the same class —
 `tensor_avgpool_kernel` dividing by zero when `pool_size == 0`
 (AUDIT Finding 16) — was subsequently filed as
-[aws-neuron/nki-samples#127](https://github.com/aws-neuron/nki-samples/issues/127),
-framed explicitly as a defensive-programming follow-on rather than a
-security finding.
+[aws-neuron/nki-samples#127](https://github.com/aws-neuron/nki-samples/issues/127)
+and closed by upstream commit
+[`bb513ac`](https://github.com/aws-neuron/nki-samples/commit/bb513ac88b716ef134eb5c92eec7c9e600c8f337),
+which added the `assert pool_size >= 1` precondition the filing proposed.
+It was framed explicitly as a defensive-programming follow-on rather than
+a security finding.
 
 ## Layout
 
@@ -102,7 +105,7 @@ asserts the kernel's output contract.
 | `interpolate_bilinear_chunk1` | `interpolate_bilinear_chunk1.py` | `kernels/interpolate_bilinear.py` | `FAILED` — chunk_size=1 boundary input (AUDIT Finding 15) |
 | `interpolate_trilinear_chunk1` | `interpolate_trilinear_chunk1.py` | `kernels/interpolate_trilinear.py` | `FAILED` — same boundary as bilinear |
 | `audit15_hostarith_unguarded` | `audit15_hostarith_unguarded.py` | — (standalone) | phase-2 only: `FAILED` with `division by zero` (CWE-369) on the upstream trip-count expression at `chunk_size = 1` (now regressed against upstream PR [#126](https://github.com/aws-neuron/nki-samples/pull/126)) |
-| `avgpool_hostarith_unguarded` | `avgpool_hostarith_unguarded.py` | — (standalone) | phase-2 only: `FAILED` with `division by zero` (CWE-369) on the upstream `tensor_avgpool_kernel` floor-divs at `pool_size = 0` — `--multi-property` surfaces both `sz_hout` and `sz_wout` sites in one run (AUDIT Finding 16; filed upstream as [#127](https://github.com/aws-neuron/nki-samples/issues/127)) |
+| `avgpool_hostarith_unguarded` | `avgpool_hostarith_unguarded.py` | — (standalone) | phase-2 only: `FAILED` with `division by zero` (CWE-369) on the upstream `tensor_avgpool_kernel` floor-divs at `pool_size = 0` — `--multi-property` surfaces both `sz_hout` and `sz_wout` sites in one run (AUDIT Finding 16; filed as [#127](https://github.com/aws-neuron/nki-samples/issues/127), now regressed against upstream fix [`bb513ac`](https://github.com/aws-neuron/nki-samples/commit/bb513ac88b716ef134eb5c92eec7c9e600c8f337)) |
 | `matmul_basic` | `matmul_basic.py` | `kernels/matmul_basic.py` | `SUCCESSFUL` |
 | `matmul_basic_buggy` | `matmul_basic_buggy.py` | `kernels/matmul_basic_buggy.py` | `FAILED` |
 | `matmul_basic_symbolic` | `matmul_basic_symbolic.py` | `kernels/matmul_basic.py` | `SUCCESSFUL` (dtype sweep; input dtype ∈ {BF16, F16, F32}; no `--unwind`) |
