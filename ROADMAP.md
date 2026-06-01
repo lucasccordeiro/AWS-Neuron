@@ -85,13 +85,52 @@ matches. v2 and v3 use larger fully-blocked layouts which already
 break the symmetry naturally; the v1 closure is the last
 discrimination gap of this kind.
 
-## Tier 4 — likely lower payoff
+## Tier 4 — `mxfp-matmul` (IN PROGRESS — reassessed in scope)
 
-| Module | Why low payoff | Effort |
+| Module | Status | Effort |
 |---|---|---|
-| `tutorials/mxfp-matmul` | Microscaled-FP quantization. Scale-tile/data-tile interaction is dtype-heavy; this PoC treats dtype as opaque tags, so verification depth is structurally lower. | 3–4 h |
+| `tutorials/mxfp-matmul` (`mx_kernels.py` + `mx_kernel_utils.py`) | 🚧 porting | 4–6 h |
 
-Skip unless dtype modelling becomes a goal.
+**Original framing (now revised).** This module was deferred as "dtype-heavy,
+so verification depth is structurally lower." Re-reading the source
+(2026-06-01) shows that framing is overstated: the kernel's correctness
+hinges on **shape handling and SBUF layout, not dtype-specific arithmetic**
+(the official docs say as much). The MX dtypes (`float8_e5m2_x4`,
+`float8_e4m3fn_x4`, `float4_e2m1fn_x4`, `uint8` scales) stay opaque tags as
+everywhere else; the real verification content is squarely shape-and-bounds:
+
+- **Partition-quadrant scale scatter** (`load_scales_scattered`): a
+  `for q in range(scale_p // 4)` loop writes 4 scale rows to dst partition
+  offset `32*q`. The bound `32*q + 4 <= data_p <= 128` is exactly the
+  partition-packing contract — same family as the `.ap()` partition-major
+  alignment work (Finding 11).
+- **dtype-reinterpreting `.ap()`** (`data.ap(dtype=mx_dtype, pattern=…)`):
+  views HBM as `_x4`, collapsing element count 4→1. New `.ap()` variant
+  that changes dtype *and* element count; bounds contract unchanged
+  (max flat offset < source element count).
+- **`quantize_mx`** free-dim /4 packing and scale-tile sizing
+  (`P//8 × F//4`, oversized to `P × F//4` when `P > 32`).
+- **packed-scale sub-partition slicing** (`packed[4:, :]`): two quantize
+  calls' scales packed at partition offsets 0 and 4 within each 32-row
+  quadrant — a bounds-checkable overlap surface.
+- **`reshape`** (2D↔3D) on HBM tensors preserving element count, and 3-level
+  strided `.ap()` for the interleaved MX layout (`copy_data_strided`).
+
+New ISA stubs: `ni_nc_matmul_mx` (data + scale operands), `ni_quantize_mx`.
+
+### Increment plan (good + buggy per kernel, ESBMC-verified each step)
+
+1. **Stub infra + `kernel_offline_quantized_mx_matmul`** — dtype-reinterpret
+   `.ap()`, `load_scales_scattered` scatter-bounds stub, `ni_nc_matmul_mx`.
+   good + buggy (buggy: scatter offset that overruns partition 128).
+2. **`kernel_on_device_quantize_matmul_mx`** — adds `ni_quantize_mx`
+   (free-dim/4, scale-tile sizing) + the FP4-reject precondition. good + buggy.
+3. **`kernel_copy_strided_quantize_matmul_mx`** — adds `reshape` + 3-level
+   strided `.ap()` (`copy_data_strided`). good + buggy.
+4. **`kernel_copy_strided_quantize_matmul_mx_packed_scale`** — packed
+   sub-partition scale slicing. good + buggy (buggy: overlapping pack offset).
+5. Manifest (`verify.py`), `Makefile`/ctest wiring, then REPORT / ROADMAP /
+   dashboard updates. +8 targets → 75 total.
 
 ## Recommended sequence
 
@@ -101,7 +140,9 @@ Skip unless dtype modelling becomes a goal.
    attention kernel. After v1 lands, decide whether v2+ and
    `pipelined_attention` are worth pursuing.
 4. **Stop or continue** based on Tier 3 outcome.
-5. **Skip Tier 4** unless dtype modelling becomes a goal.
+5. **Tier 4 (`mxfp-matmul`)** — now in scope (reassessed 2026-06-01): the
+   real content is partition-quadrant scale-scatter bounds + dtype-reinterpret
+   access patterns, not dtype arithmetic. The last unported upstream kernel.
 
 ## Per-tier blockers (today)
 

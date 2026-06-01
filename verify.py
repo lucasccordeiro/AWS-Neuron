@@ -161,6 +161,8 @@ MANIFEST: list[Target] = [
     Target("avgpool_buggy",              "avgpool_buggy.py",                     (),                "FAILED"),
     Target("avgpool_symbolic",           "avgpool_symbolic.py",                  ("--unwind", "1"), "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("ap_partition_crossing",      "ap_partition_crossing.py",             (),                "FAILED"),
+    Target("mx_offline_matmul",          "mx_offline_matmul.py",                 (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
+    Target("mx_offline_matmul_buggy",    "mx_offline_matmul_buggy.py",           (),                "FAILED"),
     Target("attn_fwd_v1",                "attn_fwd_v1.py",                       (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
     Target("attn_fwd_v1_buggy",          "attn_fwd_v1_buggy.py",                 (),                "FAILED"),
     Target("attn_fwd_v1_asym",           "attn_fwd_v1_asym.py",                  (),                "SUCCESSFUL", _SAFETY, "SUCCESSFUL"),
