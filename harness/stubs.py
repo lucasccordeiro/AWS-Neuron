@@ -426,21 +426,60 @@ def nisa_nc_matmul_mx(dst: Tile, stationary: Tile, moving: Tile,
 # (8 partition x 4 free) scaling group. Contracts: the free-dim packs 4->1
 # (dst.d1 == src.d1 // 4, and src.d1 divisible by 4); the partition extent is
 # preserved (dst.d0 == src.d0); the scale free-dim is the input free-dim // 4
-# (dst_scale.d1 == src.d1 // 4); and the scale partition extent is either the
-# single-quadrant P//8 or the spread-across-quadrants P, per allocate_mx_tiles.
-#
-# The scale-partition check is the *permissive* disjunction below: upstream
-# makes it a strict function of P (P//8 iff P <= 32, else P), but encoding that
-# strictly needs a P-dependent branch, and the current suite only quantizes
-# P = 128 (so only the `== src.d0` arm is ever taken). Increment 3's
-# copy_data_strided introduces P = 32 tiles; the strict form lands there with a
-# test that exercises the P <= 32 arm.
+# (dst_scale.d1 == src.d1 // 4); and the scale partition extent is a strict
+# function of P (per allocate_mx_tiles): single-quadrant P//8 when P <= 32, else
+# spread across the full P. Both arms are exercised by the suite: P = 128 by the
+# matmul targets (else), P = 32 by mx_quantize_small (if).
 def nisa_quantize_mx(dst: Tile, src: Tile, dst_scale: Tile) -> None:
     assert src.d1 % 4 == 0
     assert dst.d0 == src.d0
     assert dst.d1 == src.d1 // 4
     assert dst_scale.d1 == src.d1 // 4
-    assert dst_scale.d0 == src.d0 or dst_scale.d0 == src.d0 // 8
+    if src.d0 <= 32:
+        assert dst_scale.d0 == src.d0 // 8
+    else:
+        assert dst_scale.d0 == src.d0
+
+# tensor.reshape(new_shape) — an element-count-preserving reinterpretation of
+# the tile's logical shape (no data movement). The MX copy_data_strided splits
+# the contraction axis 2D (P, F) -> 3D (4, P//4, F) and folds the strided result
+# 3D (P, F, 4) -> 2D (P, F*4). Only the element-count invariant is contractual.
+def reshape_2d_to_3d(src: Tile, d0: int, d1: int, d2: int) -> Tile3D:
+    assert d0 * d1 * d2 == src.d0 * src.d1
+    return Tile3D(d0, d1, d2, src.dtype, src.buffer, PAR_D0)
+
+def reshape_3d_to_2d(src: Tile3D, d0: int, d1: int) -> Tile:
+    assert d0 * d1 == src.d0 * src.d1 * src.d2
+    return Tile(d0, d1, src.dtype, src.buffer)
+
+# tensor.ap(pattern=[[s0,c0],[s1,c1],[s2,c2]], offset=) on a 3-D source — a
+# 3-level access-pattern view returning a 3-D tile of counts (c0, c1, c2). Same
+# flat-offset envelope as the other .ap() stubs: the max reachable offset must
+# stay inside the source element count. For on-chip (SBUF/PSUM) sources the
+# partition count c0 <= PMAX and the axis-0 stride must walk whole partition
+# slabs (s0 == src.d1 * src.d2), per AUDIT Finding 11; HBM sources are exempt.
+def ap_3d_view(src: Tile3D, s0: int, c0: int, s1: int, c1: int,
+               s2: int, c2: int) -> Tile3D:
+    assert src.par_axis == PAR_D0
+    assert c0 > 0
+    assert c1 > 0
+    assert c2 > 0
+    assert s0 >= 0
+    assert s1 >= 0
+    assert s2 >= 0
+    max_offset: int = s0 * (c0 - 1) + s1 * (c1 - 1) + s2 * (c2 - 1)
+    assert max_offset < src.d0 * src.d1 * src.d2
+    if src.buffer == BUF_SBUF or src.buffer == BUF_PSUM:
+        assert c0 <= PMAX
+        assert s0 == src.d1 * src.d2
+    return Tile3D(c0, c1, c2, src.dtype, src.buffer, PAR_D0)
+
+# 3-D variant of nisa.tensor_copy (used by copy_data_strided's SBUF->SBUF
+# shuffle). Shape-only equality, like the 2-D and DMA forms.
+def nisa_tensor_copy_3d(dst: Tile3D, src: Tile3D) -> None:
+    assert dst.d0 == src.d0
+    assert dst.d1 == src.d1
+    assert dst.d2 == src.d2
 
 # ============================================================== Accumulation / reduction
 
